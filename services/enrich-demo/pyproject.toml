@@ -1,0 +1,21 @@
+[project]
+name = "echolot-enrich-demo"
+version = "0.1.0"
+description = "Prefect enrich flow: reconciles against a local table and writes via the emitter"
+requires-python = "==3.12.*"
+dependencies = [
+    "echolot-prov",
+    # Matches the specifier declared by the Enrich services repository verbatim.
+    # It is an unbounded lower bound naming a pre-release, so uv's default
+    # `if-necessary-or-explicit` mode permits pre-releases for this package only.
+    # The committed uv.lock freezes the build actually resolved.
+    "prefect>=3.7.5.dev5",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.22,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "enrich_demo"

@@ -1,0 +1,15 @@
+[project]
+name = "echolot-prov"
+version = "0.1.0"
+description = "ECHOLOT provenance envelope emitter: models, schema, context, client"
+# Library, not an application: declare the floor we test against and set no
+# ceiling, so an Enrich service on a newer Python can still depend on this.
+# The demo's own runtime is pinned to 3.12 by the workspace root instead.
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.22,<0.10.0"]
+build-backend = "uv_build"

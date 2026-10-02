@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Environments
+.venv/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# Oxigraph store (Phase 2)
+data/
+
+# uv.lock is deliberately NOT ignored: it is the reproducibility guarantee
+# behind the verbatim `prefect>=3.7.5.dev5` specifier.

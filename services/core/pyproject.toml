@@ -1,0 +1,20 @@
+[project]
+name = "echolot-core"
+version = "0.1.0"
+description = "Stand-in Core: validates envelopes and stores PROV-O (placeholder for NeoWiki)"
+requires-python = "==3.12.*"
+dependencies = [
+    "echolot-prov",
+    "fastapi[standard]>=0.115",
+    "pyoxigraph>=0.5",
+    "rdflib>=7.1",
+    "jsonschema>=4.23",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.22,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "app"
