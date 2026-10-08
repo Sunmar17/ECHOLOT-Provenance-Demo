@@ -33,8 +33,14 @@ history of an entity and reconstructs a past state.
 Do not change any of these without asking first.
 
 1. **The schema is the contract, not the library.** The JSON Schema generated
-   from the Pydantic models is committed to the repository. Any change to the
-   envelope bumps `schema_version` and regenerates the committed schema file.
+   from the Pydantic models is committed to the repository, **one file per
+   version**, at `src/echolot_prov/schemas/envelope-<version>.schema.json`,
+   inside the package so it ships in the wheel. Each file carries a versioned
+   `$id`. Any change to the envelope bumps `schema_version` and writes a **new**
+   file; a released version file is frozen and never regenerated or edited.
+   Core must be able to validate every version it has ever accepted, because a
+   migration serves two versions at once and a projection rebuild replays every
+   envelope ever stored.
 2. **Single write path.** `CoreClient.write(subject, statements, envelope)` is
    the only function that writes. No code path writes data without an envelope.
 3. **Reject the whole write.** Core validates the envelope against the committed
@@ -60,6 +66,13 @@ Do not change any of these without asking first.
 10. **Declared divergence, not simulated.** In the demo the triple store is the
     only store. In production, MariaDB revision slots are the source of truth and
     the graph store is a rebuildable projection. Do not fake a projection rebuild.
+11. **Identity is always an absolute IRI.** `Target.subject` and every entry in
+    `Target.statements` is an absolute IRI. Mapping a backend's native
+    identifiers (NeoWiki page, slot or item ids) to IRIs is a **deployment
+    configuration rule** under a declared base IRI: never an envelope field and
+    never emitter code. Putting native ids in the envelope would make its
+    contents depend on the downstream Core, breaking invariant 8, and would
+    force a schema change at Stage 2.
 
 ## Stack
 
@@ -98,6 +111,7 @@ ECHOLOT-Provenance/
   docker-compose.yml
   docs/
     IMPLEMENTATION_PLAN.md
+    revisionfile.md              # accepted risks and their trigger conditions
   packages/
     echolot-prov/
       pyproject.toml
@@ -107,7 +121,8 @@ ECHOLOT-Provenance/
         context.py               # ambient capture, injectable Context
         emitter.py               # record_activity(...) context manager
         client.py                # CoreClient: the only write path
-      schema/envelope.schema.json  # generated, committed contract
+        schemas/                 # generated, committed contract; ships in the
+          envelope-1.0.schema.json   # wheel. One frozen file per version.
       fixtures/valid/  fixtures/invalid/
       tests/
   services/
@@ -142,8 +157,16 @@ docker compose up --build                 # full demo
   for both the emitter and Core. Every valid fixture must pass and every invalid
   fixture must fail, checked both through Pydantic and through the committed
   JSON Schema.
-- A test asserts that the committed schema file equals freshly generated output
-  (schema drift check).
+- A test asserts that the committed schema file for the **current**
+  `schema_version` equals freshly generated output (schema drift check). The
+  models only ever generate the current version, so historical files cannot be
+  regenerated for comparison; a second test asserts that for every
+  `envelope-X.Y.schema.json` the filename version, the `$id` version segment and
+  the `schema_version` const all agree.
+- The schema's cross-language release channel is a git tag on this repository
+  (`schema-v1.0`), whose release asset Stage 2's PHP build vendors. The wheel
+  carries the schema for Python consumers. Nothing fetches a schema at runtime
+  (invariant 9); the `$id` is an identifier, never dereferenced.
 - Keep dependencies to those listed above. Ask before adding another.
 
 ## Working agreement

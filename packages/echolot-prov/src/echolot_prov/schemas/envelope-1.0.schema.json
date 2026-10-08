@@ -1,0 +1,403 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://w3id.org/echolot/schema/envelope/1.0",
+  "$defs": {
+    "Activity": {
+      "additionalProperties": false,
+      "description": "One activity per run (invariant 6), never one per triple.\n\n``id`` is an opaque producer-local identifier, such as a Prefect run id.\nCore mints the ``prov:Activity`` IRI from it; invariant 11 constrains only\nthe target's identifiers, so this is deliberately not an IRI.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ActivityType"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "ended_at": {
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "batch_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Batch Of"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "started_at",
+        "ended_at"
+      ],
+      "title": "Activity",
+      "type": "object"
+    },
+    "ActivityType": {
+      "enum": [
+        "reconciliation",
+        "enrichment",
+        "validation",
+        "import",
+        "deletion"
+      ],
+      "title": "ActivityType",
+      "type": "string"
+    },
+    "AgentRole": {
+      "enum": [
+        "executed",
+        "commissioned",
+        "validated"
+      ],
+      "title": "AgentRole",
+      "type": "string"
+    },
+    "Method": {
+      "additionalProperties": false,
+      "description": "How the activity reached its result.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "candidate_rank": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Rank"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Method",
+      "type": "object"
+    },
+    "PersonAgent": {
+      "additionalProperties": false,
+      "description": "A human agent, identified by an ORCID once ECCCH AAI/SSO is wired up.",
+      "properties": {
+        "type": {
+          "const": "person",
+          "title": "Type",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/AgentRole"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "role",
+        "id"
+      ],
+      "title": "PersonAgent",
+      "type": "object"
+    },
+    "Rights": {
+      "additionalProperties": false,
+      "description": "Optional rights assertion and the basis for it.",
+      "properties": {
+        "assertion": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assertion"
+        },
+        "basis": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Basis"
+        }
+      },
+      "title": "Rights",
+      "type": "object"
+    },
+    "SoftwareAgent": {
+      "additionalProperties": false,
+      "description": "A software agent, which must declare what ran and how it was configured.\n\nThe requirement is structural rather than a validator: ``Agent`` is a\ndiscriminated union, so ``model`` and ``config_hash`` are required by this\nbranch alone and the conditional is expressed in the generated JSON Schema.",
+      "properties": {
+        "type": {
+          "const": "software",
+          "title": "Type",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/AgentRole"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "config_hash": {
+          "minLength": 1,
+          "title": "Config Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "role",
+        "id",
+        "model",
+        "config_hash"
+      ],
+      "title": "SoftwareAgent",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "description": "What the activity drew on, pinned to a dump date or revision.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "snapshot": {
+          "minLength": 1,
+          "title": "Snapshot",
+          "type": "string"
+        },
+        "harvested_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Harvested At"
+        }
+      },
+      "required": [
+        "id",
+        "snapshot"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Target": {
+      "additionalProperties": false,
+      "description": "What the activity changed.\n\nBoth fields are absolute IRIs (invariant 11). Each ``statements`` entry is a\nproperty IRI; the type also admits a statement-instance IRI, which is the\nheadroom for the open PWIKI question. See ``docs/revisionfile.md`` entry 1:\na change in what an entry *means* is a ``schema_version`` bump even though\nthe shape is unchanged.",
+      "properties": {
+        "subject": {
+          "examples": [
+            "https://demo.echolot.eu/entity/person/1"
+          ],
+          "pattern": "^[A-Za-z][A-Za-z0-9+.\\-]*:\\S*$",
+          "title": "Subject",
+          "type": "string"
+        },
+        "statements": {
+          "items": {
+            "examples": [
+              "https://demo.echolot.eu/entity/person/1"
+            ],
+            "pattern": "^[A-Za-z][A-Za-z0-9+.\\-]*:\\S*$",
+            "type": "string"
+          },
+          "title": "Statements",
+          "type": "array"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "title": "Target",
+      "type": "object"
+    },
+    "Validation": {
+      "additionalProperties": false,
+      "description": "Whether a human accepted, corrected or has yet to see the result.",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/ValidationState"
+        },
+        "by": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "By"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "Validation",
+      "type": "object"
+    },
+    "ValidationState": {
+      "enum": [
+        "auto_accepted",
+        "human_accepted",
+        "human_corrected",
+        "pending"
+      ],
+      "title": "ValidationState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The provenance envelope: one per run, emitted by the service doing the work.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "activity": {
+      "$ref": "#/$defs/Activity"
+    },
+    "agents": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "person": "#/$defs/PersonAgent",
+            "software": "#/$defs/SoftwareAgent"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/SoftwareAgent"
+          },
+          {
+            "$ref": "#/$defs/PersonAgent"
+          }
+        ]
+      },
+      "minItems": 1,
+      "title": "Agents",
+      "type": "array"
+    },
+    "target": {
+      "$ref": "#/$defs/Target"
+    },
+    "method": {
+      "$ref": "#/$defs/Method"
+    },
+    "validation": {
+      "$ref": "#/$defs/Validation"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "rights": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Rights"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "schema_version",
+    "activity",
+    "agents",
+    "target",
+    "method",
+    "validation"
+  ],
+  "title": "Envelope",
+  "type": "object"
+}
