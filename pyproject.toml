@@ -21,7 +21,7 @@ echolot-core = { workspace = true }
 echolot-enrich-demo = { workspace = true }
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.14"]
+dev = ["pytest>=8", "ruff>=0.14", "jsonschema[format-nongpl]>=4.23"]
 
 [tool.ruff]
 target-version = "py312"

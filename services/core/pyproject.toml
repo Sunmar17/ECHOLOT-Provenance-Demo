@@ -8,7 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.115",
     "pyoxigraph>=0.5",
     "rdflib>=7.1",
-    "jsonschema>=4.23",
+    "jsonschema[format-nongpl]>=4.23",
 ]
 
 [build-system]

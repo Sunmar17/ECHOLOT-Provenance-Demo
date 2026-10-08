@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "activity": {
+    "id": "prefect-run-c93f1052",
+    "type": "validation",
+    "started_at": "2026-03-06T10:30:00+00:00",
+    "ended_at": "2026-03-06T10:34:12+00:00"
+  },
+  "agents": [
+    { "type": "person", "role": "validated", "id": "https://orcid.org/0000-0002-1825-0097" },
+    {
+      "type": "software",
+      "role": "commissioned",
+      "id": "echolot-curation-ui",
+      "model": "review-queue-v1",
+      "config_hash": "sha256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b"
+    }
+  ],
+  "target": {
+    "subject": "https://demo.echolot.eu/entity/person/1",
+    "statements": ["http://purl.org/dc/terms/creator"]
+  },
+  "method": {
+    "name": "curator-review",
+    "parameters": { "queue": "reconciliation-low-confidence" }
+  },
+  "validation": {
+    "state": "human_corrected",
+    "by": "https://orcid.org/0000-0002-1825-0097",
+    "at": "2026-03-06T10:34:00+00:00"
+  }
+}

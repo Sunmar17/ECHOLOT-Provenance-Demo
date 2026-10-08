@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "activity": {
+    "id": "prefect-run-e5582bc9",
+    "type": "deletion",
+    "started_at": "2026-03-09T08:05:00+00:00",
+    "ended_at": "2026-03-09T08:05:03+00:00"
+  },
+  "agents": [
+    { "type": "person", "role": "executed", "id": "https://orcid.org/0000-0002-1825-0097" }
+  ],
+  "target": {
+    "subject": "https://demo.echolot.eu/entity/person/1",
+    "statements": ["http://purl.org/dc/terms/description"]
+  },
+  "method": {
+    "name": "curator-deletion",
+    "parameters": { "reason": "duplicate statement" }
+  },
+  "validation": {
+    "state": "human_accepted",
+    "by": "https://orcid.org/0000-0002-1825-0097",
+    "at": "2026-03-09T08:05:02+00:00"
+  }
+}
