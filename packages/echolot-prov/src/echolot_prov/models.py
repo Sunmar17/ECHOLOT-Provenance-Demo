@@ -22,14 +22,19 @@ three representations of the version cannot drift apart.
 
 NonEmptyStr = Annotated[str, Field(min_length=1)]
 
+ABSOLUTE_IRI_PATTERN = r"^[A-Za-z][A-Za-z0-9+.\-]*:\S*$"
+"""An absolute IRI must carry a scheme; whitespace is never valid in one.
+
+Expressed as a pattern rather than Pydantic's ``AnyUrl`` so the constraint
+appears in the generated JSON Schema and no value is normalised: a contract must
+round-trip its inputs byte for byte. Exposed as a constant so a Core deciding
+whether an identifier needs minting tests the same rule the contract states.
+"""
+
 AbsoluteIri = Annotated[
     str,
     Field(
-        # An absolute IRI must carry a scheme; whitespace is never valid in one.
-        # Expressed as a pattern rather than Pydantic's AnyUrl so the constraint
-        # appears in the generated JSON Schema and no value is normalised: a
-        # contract must round-trip its inputs byte for byte.
-        pattern=r"^[A-Za-z][A-Za-z0-9+.\-]*:\S*$",
+        pattern=ABSOLUTE_IRI_PATTERN,
         examples=["https://demo.echolot.eu/entity/person/1"],
     ),
 ]
