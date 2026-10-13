@@ -1,0 +1,9 @@
+# Normalise line endings on commit. Without this, a file rewritten by a Python
+# script on Windows silently becomes CRLF, and every line then reads as changed
+# in the diff, which hides the real edit.
+* text=auto eol=lf
+
+# Generated and committed contract: never touched by hand, and must round-trip
+# byte for byte for the drift test to mean anything.
+*.schema.json text eol=lf
+uv.lock text eol=lf -diff
