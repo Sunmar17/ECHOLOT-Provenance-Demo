@@ -34,9 +34,14 @@ def test_current_version_is_committed():
 
 
 def test_committed_schema_matches_freshly_generated():
-    """Schema drift check, current version only."""
-    committed = (schemas_dir() / schema_filename()).read_text(encoding="utf-8")
-    assert committed == serialise(generate()), (
+    """Schema drift check, current version only.
+
+    Compared as bytes, matching how ``schema.py`` writes and checks the file.
+    Reading through text mode would translate line endings on the way in, so a
+    text comparison cannot actually verify the bytes it claims to.
+    """
+    committed = (schemas_dir() / schema_filename()).read_bytes()
+    assert committed == serialise(generate()).encode("utf-8"), (
         "committed schema differs from the models; "
         "run `uv run python -m echolot_prov.schema`"
     )

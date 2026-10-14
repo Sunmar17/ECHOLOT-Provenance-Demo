@@ -49,10 +49,16 @@ def generate(version: str = SCHEMA_VERSION) -> dict:
 
 
 def serialise(schema: dict) -> str:
-    """Render a schema as the committed file's exact bytes.
+    """Render a schema as the committed file's exact content.
 
     Key order follows Pydantic's deterministic output rather than being sorted,
     so the drift test compares like with like.
+
+    The result is written and compared as **bytes**, never through text mode.
+    ``write_text`` applies the host's line separator, which made the committed
+    contract CRLF on Windows and LF everywhere else: the same code producing
+    different normative bytes depending on who ran it. See
+    ``docs/revisionfile.md`` entry 14.
     """
     return json.dumps(schema, indent=2, ensure_ascii=False) + "\n"
 
@@ -106,11 +112,10 @@ def write(*, force: bool = False) -> tuple[Path, bool]:
     See ``docs/revisionfile.md`` entry 3.
     """
     target = schemas_dir() / schema_filename()
-    rendered = serialise(generate())
+    rendered = serialise(generate()).encode("utf-8")
 
     if target.exists():
-        current = target.read_text(encoding="utf-8")
-        if current == rendered:
+        if target.read_bytes() == rendered:
             return target, False
         if not force:
             raise FrozenSchemaError(
@@ -121,7 +126,7 @@ def write(*, force: bool = False) -> tuple[Path, bool]:
             )
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(rendered, encoding="utf-8")
+    target.write_bytes(rendered)
     return target, True
 
 
