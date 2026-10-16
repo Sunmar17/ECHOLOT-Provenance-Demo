@@ -6,4 +6,8 @@
 # Generated and committed contract: never touched by hand, and must round-trip
 # byte for byte for the drift test to mean anything.
 *.schema.json text eol=lf
-uv.lock text eol=lf -diff
+
+# The lockfile is diffable on purpose. It is the real pin behind the
+# deliberately floating `prefect>=3.7.5.dev5` specifier, so a reviewer has to be
+# able to see which versions moved. See docs/revisionfile.md entry 7.
+uv.lock text eol=lf

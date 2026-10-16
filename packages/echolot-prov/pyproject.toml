@@ -8,6 +8,9 @@ description = "ECHOLOT provenance envelope emitter: models, schema, context, cli
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2",
+    # CoreClient's transport. Injectable, so tests supply a mock or the Core app
+    # itself; see docs/IMPLEMENTATION_PLAN.md Deviations.
+    "httpx>=0.28",
 ]
 
 [build-system]
