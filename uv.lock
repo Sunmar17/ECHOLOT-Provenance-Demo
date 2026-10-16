@@ -450,11 +450,15 @@ name = "echolot-prov"
 version = "0.1.0"
 source = { editable = "packages/echolot-prov" }
 dependencies = [
+    { name = "httpx" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2" }]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "pydantic", specifier = ">=2" },
+]
 
 [[package]]
 name = "echolot-provenance"
