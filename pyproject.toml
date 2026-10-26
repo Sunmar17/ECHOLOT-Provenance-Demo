@@ -36,3 +36,9 @@ ignore = ["ANN401"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "services"]
+markers = [
+    # Prefect starts and stops a temporary server per flow run, which costs
+    # about ten seconds. Marked so `pytest -m "not slow"` stays fast; these
+    # still run by default because they are a phase's completion criterion.
+    "slow: runs a real Prefect flow",
+]

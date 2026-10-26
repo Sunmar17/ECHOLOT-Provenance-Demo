@@ -1,0 +1,45 @@
+{
+  "_comment": "A local stand-in for a Wikidata reconciliation service. Invariant 9: the demo makes no external network calls, so candidates come from here. Shaped like a dump extract: a queried name maps to ranked candidates. 'Rubens' is deliberately ambiguous, which is what gives the curator something to correct.",
+  "_source": "https://www.wikidata.org/",
+  "_snapshot": "2026-02-01",
+  "candidates": {
+    "Rubens": [
+      {
+        "id": "https://www.wikidata.org/entity/Q29190188",
+        "label": "Workshop of Rubens",
+        "score": 0.71
+      },
+      {
+        "id": "https://www.wikidata.org/entity/Q5599",
+        "label": "Peter Paul Rubens",
+        "score": 0.64
+      }
+    ],
+    "Peter Paul Rubens": [
+      {
+        "id": "https://www.wikidata.org/entity/Q5599",
+        "label": "Peter Paul Rubens",
+        "score": 0.98
+      }
+    ],
+    "Rembrandt": [
+      {
+        "id": "https://www.wikidata.org/entity/Q5598",
+        "label": "Rembrandt",
+        "score": 0.97
+      }
+    ],
+    "Jan Brueghel": [
+      {
+        "id": "https://www.wikidata.org/entity/Q213215",
+        "label": "Jan Brueghel the Elder",
+        "score": 0.69
+      },
+      {
+        "id": "https://www.wikidata.org/entity/Q520313",
+        "label": "Jan Brueghel the Younger",
+        "score": 0.66
+      }
+    ]
+  }
+}
