@@ -54,8 +54,11 @@ def test_the_stored_envelope_still_satisfies_the_contract(client):
     _, written = write_one(client)
     detail = client.get("/snapshot", params={"uri": written["snapshot"]}).json()
 
+    # Against its own version. Core keeps every committed schema precisely so a
+    # stored envelope stays valid after the contract moves on.
     validator = Draft202012Validator(
-        load_schema(), format_checker=Draft202012Validator.FORMAT_CHECKER
+        load_schema(detail["envelope"]["schema_version"]),
+        format_checker=Draft202012Validator.FORMAT_CHECKER,
     )
     assert not list(validator.iter_errors(detail["envelope"]))
 
@@ -116,3 +119,51 @@ def test_the_bare_host_redirects_to_the_page(client):
 def test_the_page_calls_every_endpoint_it_needs(client, endpoint):
     """A renamed endpoint should break a test, not just the page in a browser."""
     assert endpoint in client.get("/ui/").text
+
+
+# --------------------------------------------------------------------- batch
+
+
+def test_an_unknown_batch_is_empty(client):
+    body = client.get("/batch", params={"id": "no-such-batch"}).json()
+    assert body == {"batch": "no-such-batch", "snapshots": []}
+
+
+def test_a_batch_groups_the_snapshots_one_workflow_produced(client):
+    """A workflow is a batch; each stage is a run inside it."""
+    envelope, _ = write_one(client, "import-batch")
+    batch_id = envelope["activity"]["batch_of"]
+
+    body = client.get("/batch", params={"id": batch_id}).json()
+
+    assert len(body["snapshots"]) == 1
+    row = body["snapshots"][0]
+    assert row["subject"] == envelope["target"]["subject"]
+    assert row["generated_at"]
+    assert row["activity"]
+
+
+def test_history_reports_the_batch_a_snapshot_belongs_to(client):
+    envelope, _ = write_one(client, "import-batch")
+    snapshots = client.get(
+        "/history", params={"subject": envelope["target"]["subject"]}
+    ).json()["snapshots"]
+    assert snapshots[0]["batch"] == envelope["activity"]["batch_of"]
+
+
+def test_a_snapshot_with_no_batch_reports_none(client):
+    """Not every write comes from a workflow. A curator correction does not."""
+    envelope, _ = write_one(client, "validation-human-corrected")
+    assert envelope["activity"].get("batch_of") is None
+    snapshots = client.get(
+        "/history", params={"subject": envelope["target"]["subject"]}
+    ).json()["snapshots"]
+    assert snapshots[0]["batch"] is None
+
+
+def test_the_page_offers_a_correction_control(client):
+    """A curator must be able to correct from the page, not only a terminal."""
+    html = client.get("/ui/").text
+    assert "correctform" in html
+    assert "/correct" in html
+    assert "Apply correction" in html

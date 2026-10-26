@@ -157,6 +157,23 @@ def invert(delta: Delta) -> Delta:
 # ------------------------------------------------------------------ snapshot
 
 
+def declared_properties(target: dict) -> list[str]:
+    """The property IRIs a target names, whichever contract version wrote it.
+
+    1.0 names bare property IRIs. 1.1 names claim objects carrying a property
+    and, where the backend has one, a claim identity. Reading both here keeps
+    one Core able to serve a producer that has not upgraded yet (invariant 1).
+
+    The claim identity is deliberately not read: Core cannot place a value
+    against one particular claim until Phase 1.1b, and `POST /write` refuses
+    such an envelope rather than dropping the identity silently.
+    """
+    return [
+        entry["property"] if isinstance(entry, dict) else entry
+        for entry in target.get("statements", [])
+    ]
+
+
 def describe(envelope: dict) -> str:
     """A one-line human summary, for ``dcterms:description`` and the UI timeline."""
     activity = envelope["activity"]
@@ -228,7 +245,7 @@ def snapshot_triples(
     # Lightweight per-statement links (invariant 6), one per declared statement.
     out.extend(
         (snapshot, AFFECTED_STATEMENT, ox.NamedNode(iri))
-        for iri in target.get("statements", [])
+        for iri in declared_properties(target)
     )
 
     for agent in envelope["agents"]:

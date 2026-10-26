@@ -64,9 +64,15 @@ def test_the_real_core_rejects_an_envelope_the_emitter_did_not_build(client):
     """Core's 422 reaches the producer as a typed error with the reason intact."""
     core = CoreClient("http://testserver", client=client)
 
+    from echolot_prov.models import StatementRef
+
+    # A well-formed envelope that names a property the payload does not carry.
+    # It passes schema validation, so what rejects it is Core's integrity check.
     envelope = an_envelope()
     tampered = envelope.model_copy(deep=True)
-    tampered.target.statements = ["http://purl.org/dc/terms/undeclared"]
+    tampered.target.statements = [
+        StatementRef(property="http://purl.org/dc/terms/undeclared")
+    ]
 
     with pytest.raises(CoreValidationError) as caught:
         core.write(SUBJECT, {CREATOR: ["Rubens"]}, tampered)

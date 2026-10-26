@@ -13,11 +13,15 @@ from typing import Annotated, Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 """The current contract version.
 
 ``schema.py`` derives the committed filename and the ``$id`` from this, so the
 three representations of the version cannot drift apart.
+
+The models express one version only: the current one. Older versions live on as
+their committed schema files, which is how Core still validates envelopes a
+producer sent before upgrading.
 """
 
 NonEmptyStr = Annotated[str, Field(min_length=1)]
@@ -126,18 +130,33 @@ class Method(_Base):
     candidate_rank: int | None = Field(default=None, ge=1)
 
 
-class Target(_Base):
-    """What the activity changed.
+class StatementRef(_Base):
+    """One claim a run touched.
 
-    Both fields are absolute IRIs (invariant 11). Each ``statements`` entry is a
-    property IRI; the type also admits a statement-instance IRI, which is the
-    headroom for the open PWIKI question. See ``docs/revisionfile.md`` entry 1:
-    a change in what an entry *means* is a ``schema_version`` bump even though
-    the shape is unchanged.
+    In 1.0 a run could name only the *property* it changed. Two claims of the
+    same property were then indistinguishable, so a run that changed both left
+    a record nobody could read back: two removals, two additions, and no way to
+    pair them. This is why 1.1 exists.
+
+    ``statement`` is optional because a producer asserting a *new* claim has no
+    identifier for it yet. One changing an existing claim names it.
     """
 
+    property: AbsoluteIri
+    """Which property, such as ``dcterms:creator``."""
+
+    statement: AbsoluteIri | None = None
+    """Which claim, where the backend gives claims their own identity.
+
+    An identity for the claim, never for the subject (invariant 11).
+    """
+
+
+class Target(_Base):
+    """What the activity changed."""
+
     subject: AbsoluteIri
-    statements: list[AbsoluteIri] = Field(default_factory=list)
+    statements: list[StatementRef] = Field(default_factory=list)
 
 
 class Validation(_Base):
@@ -158,7 +177,7 @@ class Rights(_Base):
 class Envelope(_Base):
     """The provenance envelope: one per run, emitted by the service doing the work."""
 
-    schema_version: Literal["1.0"]
+    schema_version: Literal["1.1"]
     activity: Activity
     agents: list[Agent] = Field(min_length=1)
     target: Target

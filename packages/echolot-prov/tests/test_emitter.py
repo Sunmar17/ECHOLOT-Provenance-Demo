@@ -62,7 +62,11 @@ TWO_SECONDS = (
     ],
 )
 def test_diff_statements(before, after, expected):
-    assert diff_statements(before, after) == expected
+    # A diff keyed by property cannot name a claim, so each reference carries a
+    # property and no identity.
+    found = diff_statements(before, after)
+    assert [ref.property for ref in found] == expected
+    assert all(ref.statement is None for ref in found)
 
 
 # ------------------------------------------------------------------- recorder
@@ -107,7 +111,7 @@ def test_statements_are_derived_not_declared():
         act.method("m")
         act.changed({CREATOR: ["a"], DATE: ["1625"]}, {CREATOR: ["b"], DATE: ["1625"]})
 
-    assert act.envelope.target.statements == [CREATOR]
+    assert [s.property for s in act.envelope.target.statements] == [CREATOR]
 
 
 def test_timestamps_bracket_the_block():
@@ -188,3 +192,49 @@ def test_rights_and_batch_are_carried():
     validate_against_committed_schema(envelope)
     assert envelope.activity.batch_of == "import-batch-2026-03"
     assert envelope.rights.basis == "agreement"
+
+
+# ------------------------------------------------- one stage of a workflow
+
+
+def _envelope(**context_fields):
+    ctx = Context.from_dict(
+        {
+            "service": "echolot-reconciler",
+            "model": "m",
+            "config_hash": "sha256:" + "a" * 64,
+            **context_fields,
+        }
+    )
+    with record_activity(
+        "reconciliation", context=ctx, subject=SUBJECT, clock=fixed_clock(*TWO_SECONDS)
+    ) as act:
+        act.method("m")
+    return act.envelope
+
+
+def test_inside_a_task_the_stage_gets_its_own_activity_id():
+    """A workflow is a batch; each stage is a run with its own activity.
+
+    Prefect gives every stage the same flow run id and a different task run
+    id. Using the flow id for both would give three stages one activity id,
+    and Core would collapse them into a single activity.
+    """
+    first = _envelope(run_id="FLOW-1", task_id="TASK-A")
+    second = _envelope(run_id="FLOW-1", task_id="TASK-B")
+
+    assert first.activity.id == "TASK-A"
+    assert second.activity.id == "TASK-B"
+    assert first.activity.batch_of == second.activity.batch_of == "FLOW-1"
+
+
+def test_outside_a_task_there_is_no_batch():
+    envelope = _envelope(run_id="FLOW-9")
+    assert envelope.activity.id == "FLOW-9"
+    assert envelope.activity.batch_of is None
+
+
+def test_without_prefect_the_activity_id_is_synthesised():
+    envelope = _envelope()
+    assert envelope.activity.id.startswith("echolot-reconciler-")
+    assert envelope.activity.batch_of is None

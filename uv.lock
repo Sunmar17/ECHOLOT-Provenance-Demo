@@ -436,12 +436,14 @@ version = "0.1.0"
 source = { editable = "services/enrich-demo" }
 dependencies = [
     { name = "echolot-prov" },
+    { name = "fastapi", extra = ["standard"] },
     { name = "prefect" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "echolot-prov", editable = "packages/echolot-prov" },
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.115" },
     { name = "prefect", specifier = ">=3.7.5.dev5" },
 ]
 

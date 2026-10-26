@@ -52,8 +52,12 @@ Do not change any of these without asking first.
    context in, validated JSON out, no I/O. Ambient capture lives in `context.py`
    and is injectable: `Context` can be built from the live environment or from a
    plain dict. This keeps the emitter testable and a future sidecar cheap.
-6. **Two-tier PROV-O granularity.** One activity and one snapshot record per run,
-   with lightweight per-statement links. Never one `prov:Activity` per triple.
+6. **Two-tier PROV-O granularity.** One activity and one snapshot record per
+   run, with per-statement links beneath them. Never one `prov:Activity` per
+   triple: that is the rule this invariant exists to state. From schema 1.1 a
+   per-statement link may carry its own delta, so these links are no longer
+   "lightweight" in the sense the earlier wording used. The tiering is what
+   matters, not the size of the lower tier.
 7. **Snapshot chain.** Each snapshot is `prov:wasDerivedFrom` the previous head
    snapshot of the same subject. The delta is stored as `oco:hasUpdateQuery`
    (INSERT DATA / DELETE DATA). Reconstruction walks the chain backwards and
@@ -66,8 +70,11 @@ Do not change any of these without asking first.
 10. **Declared divergence, not simulated.** In the demo the triple store is the
     only store. In production, MariaDB revision slots are the source of truth and
     the graph store is a rebuildable projection. Do not fake a projection rebuild.
-11. **Identity is always an absolute IRI.** `Target.subject` and every entry in
-    `Target.statements` is an absolute IRI. Mapping a backend's native
+11. **Identity is always an absolute IRI.** `Target.subject` is an absolute
+    IRI, and so is every `property` and `statement` inside `Target.statements`.
+    A statement IRI identifies **one claim**, never the subject that claim is
+    about: `<person/42>` and the claim "person 42 has creator X" are different
+    things with different identifiers. Mapping a backend's native
     identifiers (NeoWiki page, slot or item ids) to IRIs is a **deployment
     configuration rule** under a declared base IRI: never an envelope field and
     never emitter code. Putting native ids in the envelope would make its
@@ -122,8 +129,9 @@ ECHOLOT-Provenance/
         emitter.py               # record_activity(...) context manager
         client.py                # CoreClient: the only write path
         schemas/                 # generated, committed contract; ships in the
-          envelope-1.0.schema.json   # wheel. One frozen file per version.
-      fixtures/valid/  fixtures/invalid/
+          envelope-1.0.schema.json   # wheel. One frozen file per version:
+          envelope-1.1.schema.json   # 1.1 names individual claims.
+      fixtures/<version>/valid/  fixtures/<version>/invalid/
       tests/
   services/
     core/
@@ -153,10 +161,12 @@ docker compose up --build                 # full demo
 ## Conventions
 
 - Type hints throughout. Timestamps are timezone-aware UTC, ISO 8601.
-- Fixtures under `packages/echolot-prov/fixtures/` are the shared test corpus
-  for both the emitter and Core. Every valid fixture must pass and every invalid
-  fixture must fail, checked both through Pydantic and through the committed
-  JSON Schema.
+- Fixtures under `packages/echolot-prov/fixtures/<version>/` are the shared test
+  corpus for both the emitter and Core, organised by contract version. Two rules,
+  and they differ: **every** fixture of **any** version is checked against its
+  own committed JSON Schema, which is what proves Core still accepts envelopes a
+  producer sent before upgrading; **only** current-version fixtures are also
+  checked through Pydantic, because the models express one version at a time.
 - A test asserts that the committed schema file for the **current**
   `schema_version` equals freshly generated output (schema drift check). The
   models only ever generate the current version, so historical files cannot be

@@ -56,6 +56,24 @@ td.k { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
 td.v { font-weight: 600; }
 
 .hint { color: var(--ink-2); font-size: 13px; }
+
+.runbar { background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: 12px 20px; display: flex; gap: 10px; align-items: center;
+  flex-wrap: wrap; }
+.runbar label { font-size: 12px; color: var(--ink-2); }
+.runbar input { font: inherit; font-size: 13px; padding: 6px 9px;
+  border: 1px solid var(--line); border-radius: 4px; min-width: 180px; }
+.runbar button { font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px;
+  border: 0; border-radius: 4px; background: var(--accent); color: #fff;
+  cursor: pointer; }
+.runbar button:disabled { opacity: 0.55; cursor: progress; }
+.status { font-size: 12.5px; color: var(--ink-2); }
+.status.bad { color: #8a3d4e; }
+.correctbar { background: var(--paper); }
+.correctbar button { background: var(--person); }
+
+.batch { font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+.item.fresh { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .at { font-family: var(--mono); font-size: 12px; color: var(--accent);
   background: var(--accent-soft); padding: 5px 8px; border-radius: 3px;
   margin-bottom: 12px; display: block; }
@@ -77,6 +95,24 @@ dialog::backdrop { background: rgba(16, 34, 43, 0.4); }
   <h1>ECHOLOT Curator</h1>
   <p>Pick a subject. Pick a moment in its history. See what it said then.</p>
 </header>
+
+<form class="runbar" id="runform">
+  <label for="name">Name</label>
+  <input id="name" name="name" value="Rubens" required>
+  <label for="subject">Subject</label>
+  <input id="subject" name="subject" value="https://demo.echolot.eu/entity/object/1" required>
+  <button id="runbtn" type="submit">Run workflow</button>
+  <span class="status" id="status">Three stages: reconcile, enrich, quality check.</span>
+</form>
+
+<form class="runbar correctbar" id="correctform">
+  <label for="corrected">Correct creator to</label>
+  <input id="corrected" name="corrected" value="Peter Paul Rubens" required>
+  <label for="curator">as</label>
+  <input id="curator" name="curator" value="https://orcid.org/0000-0002-1825-0097" required>
+  <button id="correctbtn" type="submit">Apply correction</button>
+  <span class="status" id="correctstatus">A person, not a workflow. No batch id.</span>
+</form>
 
 <div class="columns">
   <section class="col">
@@ -112,6 +148,12 @@ const get = async (path, params) =>
   (await fetch(path + "?" + new URLSearchParams(params))).json();
 
 let subject = null;
+let freshBatch = null;
+
+// The enrich service runs the workflow. Core is a store and does not run
+// flows, which is why the trigger lives on another port.
+const ENRICH_URL =
+  new URLSearchParams(location.search).get("enrich") || "http://127.0.0.1:8001";
 
 function shortName(iri) {
   return iri.split("/").slice(-2).join("/");
@@ -143,6 +185,7 @@ async function loadSubjects() {
   for (const iri of subjects) {
     const button = document.createElement("button");
     button.className = "item";
+    button.dataset.iri = iri;
     button.innerHTML = '<div class="name">' + shortName(iri) + "</div>";
     button.onclick = () => selectSubject(iri, button);
     el("subjects").append(button);
@@ -168,7 +211,14 @@ async function selectSubject(iri, button) {
         (human ? "person" : "software") + "</span>" +
       '<span class="tag">' + (snapshots.length - index) + "</span></div>" +
       '<div class="meta">' + snap.description + "</div>" +
-      '<div class="meta">' + snap.generated_at + "</div>";
+      '<div class="meta">' + snap.generated_at + "</div>" +
+      (snap.batch
+        ? '<div class="batch">batch ' + snap.batch.slice(0, 8) + "</div>"
+        : "");
+
+    // Mark the stages produced by the run that just finished, so a person can
+    // see which rows came from one workflow.
+    if (freshBatch && snap.batch === freshBatch) row.classList.add("fresh");
 
     // The whole row selects the moment; the link opens the envelope.
     row.onclick = () => selectSnapshot(snap, row);
@@ -216,6 +266,84 @@ async function showEnvelope(uri) {
   el("details-body").textContent = JSON.stringify(detail.envelope, null, 2);
   el("details").showModal();
 }
+
+// --- running a workflow ---------------------------------------------------
+el("runform").onsubmit = async (event) => {
+  event.preventDefault();
+  const button = el("runbtn");
+  const status = el("status");
+  const target = el("subject").value;
+
+  button.disabled = true;
+  status.className = "status";
+  status.textContent = "Running three stages… this takes a few seconds.";
+
+  try {
+    const response = await fetch(ENRICH_URL + "/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: el("name").value, subject: target }),
+    });
+    if (!response.ok) throw new Error("the enrich service returned " + response.status);
+
+    const result = await response.json();
+    freshBatch = result.batch;
+    status.textContent =
+      result.stages.length + " stages written, batch " + result.batch.slice(0, 8);
+
+    await loadSubjects();
+    const match = [...document.querySelectorAll("#subjects .item")].find(
+      (b) => b.dataset.iri === target
+    );
+    if (match) await selectSubject(target, match);
+  } catch (error) {
+    status.className = "status bad";
+    status.textContent =
+      "Could not reach the enrich service at " + ENRICH_URL + ". " + error.message;
+  } finally {
+    button.disabled = false;
+  }
+};
+
+el("correctform").onsubmit = async (event) => {
+  event.preventDefault();
+  const button = el("correctbtn");
+  const status = el("correctstatus");
+  const target = el("subject").value;
+
+  button.disabled = true;
+  status.className = "status";
+  status.textContent = "Applying…";
+
+  try {
+    const response = await fetch(ENRICH_URL + "/correct", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: target,
+        corrected: el("corrected").value,
+        curator: el("curator").value,
+      }),
+    });
+    if (!response.ok) throw new Error("the enrich service returned " + response.status);
+    await response.json();
+
+    // A correction belongs to no workflow, so nothing is marked fresh.
+    freshBatch = null;
+    status.textContent = "Corrected. The newest snapshot is now a person's.";
+
+    await loadSubjects();
+    const match = [...document.querySelectorAll("#subjects .item")].find(
+      (b) => b.dataset.iri === target
+    );
+    if (match) await selectSubject(target, match);
+  } catch (error) {
+    status.className = "status bad";
+    status.textContent = "Could not apply the correction. " + error.message;
+  } finally {
+    button.disabled = false;
+  }
+};
 
 loadSubjects();
 </script>

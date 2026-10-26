@@ -1,5 +1,5 @@
 {
-  "_comment": "A local stand-in for a Wikidata reconciliation service. Invariant 9: the demo makes no external network calls, so candidates come from here. Shaped like a dump extract: a queried name maps to ranked candidates. 'Rubens' is deliberately ambiguous, which is what gives the curator something to correct.",
+  "_comment": "A local stand-in for a Wikidata reconciliation service. Invariant 9: the demo makes no external network calls, so candidates come from here. Shaped like a dump extract: a queried name maps to ranked candidates, and each candidate carries the facts the enrichment stage copies across. 'Rubens' is deliberately ambiguous, which is what gives the curator something to correct.",
   "_source": "https://www.wikidata.org/",
   "_snapshot": "2026-02-01",
   "candidates": {
@@ -7,39 +7,68 @@
       {
         "id": "https://www.wikidata.org/entity/Q29190188",
         "label": "Workshop of Rubens",
-        "score": 0.71
+        "score": 0.71,
+        "facts": {
+          "http://purl.org/dc/terms/created": "1600-01-01",
+          "http://purl.org/dc/terms/spatial": "Antwerp"
+        }
       },
       {
         "id": "https://www.wikidata.org/entity/Q5599",
         "label": "Peter Paul Rubens",
-        "score": 0.64
+        "score": 0.64,
+        "facts": {
+          "http://purl.org/dc/terms/created": "1577-06-28",
+          "http://purl.org/dc/terms/spatial": "Siegen"
+        }
       }
     ],
     "Peter Paul Rubens": [
       {
         "id": "https://www.wikidata.org/entity/Q5599",
         "label": "Peter Paul Rubens",
-        "score": 0.98
+        "score": 0.98,
+        "facts": {
+          "http://purl.org/dc/terms/created": "1577-06-28",
+          "http://purl.org/dc/terms/spatial": "Siegen"
+        }
       }
     ],
     "Rembrandt": [
       {
         "id": "https://www.wikidata.org/entity/Q5598",
         "label": "Rembrandt",
-        "score": 0.97
+        "score": 0.97,
+        "facts": {
+          "http://purl.org/dc/terms/created": "1606-07-15",
+          "http://purl.org/dc/terms/spatial": "Leiden"
+        }
       }
     ],
     "Jan Brueghel": [
       {
         "id": "https://www.wikidata.org/entity/Q213215",
         "label": "Jan Brueghel the Elder",
-        "score": 0.69
+        "score": 0.69,
+        "facts": {
+          "http://purl.org/dc/terms/created": "1568-01-01",
+          "http://purl.org/dc/terms/spatial": "Brussels"
+        }
       },
       {
         "id": "https://www.wikidata.org/entity/Q520313",
         "label": "Jan Brueghel the Younger",
-        "score": 0.66
+        "score": 0.66,
+        "facts": {
+          "http://purl.org/dc/terms/created": "1601-09-13",
+          "http://purl.org/dc/terms/spatial": "Antwerp"
+        }
       }
     ]
-  }
+  },
+  "_required_properties": [
+    "http://purl.org/dc/terms/creator",
+    "http://purl.org/dc/terms/created",
+    "http://purl.org/dc/terms/spatial"
+  ]
 }

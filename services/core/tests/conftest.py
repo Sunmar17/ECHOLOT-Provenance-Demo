@@ -15,17 +15,28 @@ from fastapi.testclient import TestClient
 REPO = Path(__file__).resolve().parents[3]
 FIXTURES = REPO / "packages" / "echolot-prov" / "fixtures"
 
+# Core is tested against the version whose payload it can apply. A 1.1 envelope
+# naming a claim identity is refused on purpose until Phase 1.1b, and
+# test_version_guard.py covers that case directly.
+CORE_VERSION = "1.0"
+
 
 def _load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def valid_envelopes() -> list[tuple[str, dict]]:
-    return [(p.stem, _load(p)) for p in sorted((FIXTURES / "valid").glob("*.json"))]
+    return [
+        (p.stem, _load(p))
+        for p in sorted((FIXTURES / CORE_VERSION / "valid").glob("*.json"))
+    ]
 
 
 def invalid_envelopes() -> list[tuple[str, dict]]:
-    return [(p.stem, _load(p)) for p in sorted((FIXTURES / "invalid").glob("*.json"))]
+    return [
+        (p.stem, _load(p))
+        for p in sorted((FIXTURES / CORE_VERSION / "invalid").glob("*.json"))
+    ]
 
 
 def payload_for(envelope: dict, value: str = "example value") -> dict[str, Any]:
@@ -35,9 +46,11 @@ def payload_for(envelope: dict, value: str = "example value") -> dict[str, Any]:
     properties it names. Strict integrity checking means these must line up with
     ``Target.statements`` exactly.
     """
+    statements = envelope.get("target", {}).get("statements", [])
+    properties = [s["property"] if isinstance(s, dict) else s for s in statements]
     return {
         predicate: [{"type": "literal", "value": f"{value} for {predicate}"}]
-        for predicate in envelope.get("target", {}).get("statements", [])
+        for predicate in properties
     }
 
 

@@ -69,6 +69,18 @@ def reconstruct(
     return state
 
 
+def _batch_of(store: Store, props: dict[str, list[Term]]) -> str | None:
+    """The workflow a snapshot belongs to, if it came from one.
+
+    The batch id sits on the activity, not the snapshot, because a workflow
+    groups runs rather than records.
+    """
+    activity = props.get(PROV.wasGeneratedBy.value)
+    if not activity:
+        return None
+    return _one(store.properties_of(activity[0]).get(ECHOLOT.batch.value))
+
+
 def history(store: Store, subject: ox.NamedNode) -> list[dict]:
     """The snapshot chain, newest first, with what a curator needs to read it."""
     out: list[dict] = []
@@ -85,6 +97,7 @@ def history(store: Store, subject: ox.NamedNode) -> list[dict]:
                 "validation_state": _one(props.get(ECHOLOT.validationState.value)),
                 "activity": _one(props.get(PROV.wasGeneratedBy.value)),
                 "derived_from": _one(props.get(PROV.wasDerivedFrom.value)),
+                "batch": _batch_of(store, props),
             }
         )
     return out

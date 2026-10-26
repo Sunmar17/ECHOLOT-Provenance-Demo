@@ -1,13 +1,19 @@
-"""Prefect flows: reconcile a name against a local table, then write.
+"""A Prefect workflow in three stages, each emitting its own provenance.
 
-The point of this module is that provenance is not a step. Nobody calls
-"record provenance" after doing the work: the work happens inside
-``record_activity`` and the envelope falls out of having done it. That is what
-FR3.5 asks for, and it is why the emitter is shaped the way it is.
+The shape this models:
 
-Orchestration is kept separate from logic. Each ``@flow`` is a thin wrapper that
-captures the live environment and calls a plain function, so the logic is
-testable in milliseconds and only the integration test pays for Prefect.
+    ONE WORKFLOW RUN = ONE BATCH  (the Prefect flow run id)
+        |
+        +-- stage 1  reconciliation   WP4 T4.2
+        +-- stage 2  enrichment       WP4 T4.3
+        +-- stage 3  quality check    WP4 T4.5
+
+Each stage is a Prefect task. Each stage emits one envelope and writes once.
+All three carry the same batch id, so a workflow can be traced afterwards.
+
+Nothing here calls "record provenance" as a separate step. The work of each
+stage happens inside ``record_activity``, and the envelope falls out of having
+done it. That is what FR3.5 asks for.
 """
 
 import json
@@ -15,53 +21,50 @@ import os
 from importlib import resources
 from typing import Any
 
-from echolot_prov.client import CoreClient
+from echolot_prov.client import CoreClient, iri
 from echolot_prov.context import Context
 from echolot_prov.emitter import record_activity
 from prefect import flow, task
 
 CREATOR = "http://purl.org/dc/terms/creator"
+MATCHED = "http://purl.org/dc/terms/references"
+QUALITY = "http://purl.org/dc/terms/conformsTo"
 
-SERVICE = "echolot-reconciler"
-"""The agent's identity in the provenance, not the package it ships in."""
+SERVICE_RECONCILE = "echolot-reconciler"
+SERVICE_ENRICH = "echolot-enricher"
+SERVICE_QUALITY = "echolot-quality"
+CURATOR_SERVICE = "echolot-curator-ui"
 
 DISTRIBUTION = "echolot-enrich-demo"
-MODEL = "name-match-v2"
-CURATOR_SERVICE = "echolot-curator-ui"
-CURATOR_MODEL = "review-queue-v1"
-
 CORE_URL_ENV = "ECHOLOT_CORE_URL"
 DEFAULT_CORE_URL = "http://127.0.0.1:8000"
 
 RECONCILE_CONFIG: dict[str, Any] = {"table": "wikidata-standin", "threshold": 0.6}
-"""The configuration whose hash goes into the envelope.
-
-Changing a threshold changes the hash, so two runs that disagree are
-distinguishable after the fact rather than looking identical.
-"""
+ENRICH_CONFIG: dict[str, Any] = {"copy_facts": True}
+QUALITY_CONFIG: dict[str, Any] = {"rule": "required-properties-present"}
 
 
 def make_client(core_url: str) -> CoreClient:
-    """Build the client a flow writes through.
+    """Build the client a stage writes through.
 
     A seam, not an abstraction: tests replace this to point at a Core served
-    in-process, so no flow ever needs a port to be under test.
+    in-process, so no stage needs a port to be under test.
     """
     return CoreClient(core_url)
 
 
-def core_url() -> str:
-    return os.environ.get(CORE_URL_ENV) or DEFAULT_CORE_URL
+def core_url(url: str | None = None) -> str:
+    return url or os.environ.get(CORE_URL_ENV) or DEFAULT_CORE_URL
 
 
-# --------------------------------------------------------------------- lookup
+# --------------------------------------------------------------------- table
 
 
 def load_table() -> dict[str, Any]:
     """The local stand-in for a Wikidata reconciliation service.
 
-    Read from the package rather than fetched. Invariant 9: no external network
-    calls at runtime, so the demo is reproducible and offline.
+    Read from the package, never fetched. Invariant 9: no external network
+    calls at runtime, so the demo is reproducible and works offline.
     """
     text = (
         resources.files("enrich_demo")
@@ -73,37 +76,35 @@ def load_table() -> dict[str, Any]:
 
 def reconcile(name: str) -> list[dict[str, Any]]:
     """Candidates for a name, best first. Pure and deterministic."""
-    table = load_table()
-    candidates = table["candidates"].get(name, [])
+    candidates = load_table()["candidates"].get(name, [])
     return sorted(candidates, key=lambda c: (-c["score"], c["id"]))
 
 
-# ----------------------------------------------------------------- the work
+def missing_properties(state: dict[str, Any], required: list[str]) -> list[str]:
+    """Which required properties have no value. Pure."""
+    return sorted(p for p in required if not state.get(p))
 
 
-def run_reconciliation(
+# ---------------------------------------------------------------- the stages
+
+
+def stage_reconcile(
     subject: str, name: str, *, context: Context, client: CoreClient
 ) -> dict[str, Any]:
-    """Reconcile a name and write the result with its provenance.
-
-    The write and the envelope leave together through the single write path,
-    so there is no moment where the data exists without the record of why.
-    """
+    """Stage 1. Find which real entity a name refers to. WP4 T4.2."""
     table = load_table()
+    candidates = reconcile(name)
 
     with record_activity("reconciliation", context=context, subject=subject) as act:
-        candidates = reconcile(name)
+        act.used(table["_source"], snapshot=table["_snapshot"])
         if not candidates:
-            # A real curation event: we looked and found nothing. Core accepts
-            # the empty delta and still records that the search happened.
-            act.used(table["_source"], snapshot=table["_snapshot"])
+            # A real curation event: we looked and found nothing.
             act.method("name-match", **RECONCILE_CONFIG)
             act.changed({}, {})
             after: dict[str, list[Any]] = {}
         else:
             best = candidates[0]
-            after = {CREATOR: [best["label"]]}
-            act.used(table["_source"], snapshot=table["_snapshot"])
+            after = {CREATOR: [best["label"]], MATCHED: [iri(best["id"])]}
             act.method(
                 "name-match",
                 confidence=best["score"],
@@ -112,17 +113,98 @@ def run_reconciliation(
             )
             act.changed({}, after)
 
-    return client.write(subject, after, act.envelope)
+    written = client.write(subject, after, act.envelope)
+    return {
+        "stage": "reconciliation",
+        "snapshot": written["snapshot"],
+        "batch": act.envelope.activity.batch_of,
+        "activity": act.envelope.activity.id,
+        "candidate": candidates[0] if candidates else None,
+        "state": {k: v for k, v in after.items()},
+    }
+
+
+def stage_enrich(
+    subject: str,
+    candidate: dict[str, Any] | None,
+    *,
+    context: Context,
+    client: CoreClient,
+) -> dict[str, Any]:
+    """Stage 2. Copy known facts about the matched entity across. WP4 T4.3.
+
+    Uses stage 1's result. This is the step that was missing before: the
+    stages were independent, so nothing flowed between them.
+    """
+    table = load_table()
+    facts = (candidate or {}).get("facts", {})
+    after = {prop: [value] for prop, value in sorted(facts.items())}
+
+    with record_activity("enrichment", context=context, subject=subject) as act:
+        act.used(table["_source"], snapshot=table["_snapshot"])
+        act.method(
+            "fact-copy",
+            confidence=candidate["score"] if candidate else None,
+            **ENRICH_CONFIG,
+        )
+        act.changed({}, after)
+
+    written = client.write(subject, after, act.envelope)
+    return {
+        "stage": "enrichment",
+        "snapshot": written["snapshot"],
+        "batch": act.envelope.activity.batch_of,
+        "activity": act.envelope.activity.id,
+        "added": sorted(after),
+        "state": after,
+    }
+
+
+def stage_quality_check(
+    subject: str,
+    state: dict[str, Any],
+    *,
+    context: Context,
+    client: CoreClient,
+) -> dict[str, Any]:
+    """Stage 3. Check the record is complete enough to publish. WP4 T4.5.
+
+    Records its own verdict as data, so the judgement is itself provenanced.
+    A failing check is not an error: it is a finding worth keeping.
+    """
+    table = load_table()
+    missing = missing_properties(state, table["_required_properties"])
+    verdict = "incomplete" if missing else "complete"
+    after = {QUALITY: [verdict]}
+
+    with record_activity("validation", context=context, subject=subject) as act:
+        act.method(
+            "required-properties",
+            missing=missing,
+            checked=table["_required_properties"],
+            **QUALITY_CONFIG,
+        )
+        act.changed({}, after)
+        act.validated("auto_accepted")
+
+    written = client.write(subject, after, act.envelope)
+    return {
+        "stage": "quality-check",
+        "snapshot": written["snapshot"],
+        "batch": act.envelope.activity.batch_of,
+        "activity": act.envelope.activity.id,
+        "verdict": verdict,
+        "missing": missing,
+    }
 
 
 def run_correction(
     subject: str, corrected: str, curator: str, *, context: Context, client: CoreClient
 ) -> dict[str, Any]:
-    """A curator corrects an attribution, as a validation activity.
+    """A curator corrects an attribution. Not a stage: a separate event.
 
-    The affected property is stated rather than diffed: a curator looking at one
-    field has no "before" state of the whole entity to hand. That is what
-    ``.statements()`` is for.
+    The affected property is stated rather than diffed, because a curator
+    looking at one field has no "before" state of the whole entity to hand.
     """
     with record_activity("validation", context=context, subject=subject) as act:
         act.method("curator-review", queue="low-confidence")
@@ -136,41 +218,84 @@ def run_correction(
 # -------------------------------------------------------------- orchestration
 
 
-@task
-def reconcile_task(name: str) -> list[dict[str, Any]]:
-    """Exposes the lookup as a Prefect task, so the demo has something to show."""
-    return reconcile(name)
+def _context(service: str, model: str, config: dict[str, Any]) -> Context:
+    """Ambient capture for one stage.
 
-
-@flow(name="reconcile-person")
-def reconcile_person(name: str, subject: str, url: str | None = None) -> dict[str, Any]:
-    """Run 1: an automated service reconciles a name against the local table.
-
-    ``Context.from_environment`` picks up the Prefect run id here, so the
-    activity in the provenance is the actual orchestrated run rather than a
-    synthesised identifier.
+    Built inside the task, so Prefect supplies this stage's own task run id.
+    The emitter turns that into the activity id and turns the flow run id into
+    the batch id.
     """
-    context = Context.from_environment(
-        SERVICE, MODEL, RECONCILE_CONFIG, distribution=DISTRIBUTION
+    return Context.from_environment(service, model, config, distribution=DISTRIBUTION)
+
+
+@task(name="reconcile")
+def task_reconcile(subject: str, name: str, url: str | None) -> dict[str, Any]:
+    return stage_reconcile(
+        subject,
+        name,
+        context=_context(SERVICE_RECONCILE, "name-match-v2", RECONCILE_CONFIG),
+        client=make_client(core_url(url)),
     )
-    reconcile_task(name)
-    return run_reconciliation(
-        subject, name, context=context, client=make_client(url or core_url())
+
+
+@task(name="enrich")
+def task_enrich(
+    subject: str, candidate: dict[str, Any] | None, url: str | None
+) -> dict[str, Any]:
+    return stage_enrich(
+        subject,
+        candidate,
+        context=_context(SERVICE_ENRICH, "fact-copy-v1", ENRICH_CONFIG),
+        client=make_client(core_url(url)),
     )
+
+
+@task(name="quality-check")
+def task_quality_check(
+    subject: str, state: dict[str, Any], url: str | None
+) -> dict[str, Any]:
+    return stage_quality_check(
+        subject,
+        state,
+        context=_context(SERVICE_QUALITY, "required-properties-v1", QUALITY_CONFIG),
+        client=make_client(core_url(url)),
+    )
+
+
+@flow(name="curate-entity")
+def curate_entity(name: str, subject: str, url: str | None = None) -> dict[str, Any]:
+    """The whole workflow. One run of this is one batch.
+
+    Each stage writes its own provenance as it goes, so a failure in stage 3
+    leaves stages 1 and 2 recorded rather than losing the whole run.
+    """
+    first = task_reconcile(subject, name, url)
+    second = task_enrich(subject, first["candidate"], url)
+
+    # What stage 3 judges is everything the earlier stages asserted.
+    state = {**first["state"], **second["state"]}
+    third = task_quality_check(subject, state, url)
+
+    return {
+        "batch": first["batch"],
+        "subject": subject,
+        "name": name,
+        "stages": [first, second, third],
+    }
 
 
 @flow(name="correct-attribution")
 def correct_attribution(
     subject: str, corrected: str, curator: str, url: str | None = None
 ) -> dict[str, Any]:
-    """Run 2: a curator corrects the result, attributed to a person."""
+    """A curator corrects what the workflow produced."""
     context = Context.from_environment(
-        CURATOR_SERVICE, CURATOR_MODEL, {}, distribution=DISTRIBUTION, operator=curator
+        CURATOR_SERVICE,
+        "review-queue-v1",
+        {},
+        distribution=DISTRIBUTION,
+        operator=curator,
     )
     return run_correction(
-        subject,
-        corrected,
-        curator,
-        context=context,
-        client=make_client(url or core_url()),
+        subject, corrected, curator, context=context, client=make_client(core_url(url))
     )

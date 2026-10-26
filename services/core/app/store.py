@@ -15,6 +15,7 @@ from pathlib import Path
 import pyoxigraph as ox
 
 from app.namespaces import (
+    ECHOLOT,
     GRAPH_DATA,
     GRAPH_PROVENANCE,
     NAMED_GRAPHS,
@@ -126,6 +127,28 @@ class Store:
             g.value: sum(1 for _ in self._store.quads_for_pattern(None, None, None, g))
             for g in NAMED_GRAPHS
         }
+
+    def snapshots_in_batch(self, batch: str) -> list[ox.NamedNode]:
+        """Every snapshot produced by one workflow run.
+
+        A workflow is a batch; each of its stages is a run with its own
+        activity. The batch id lives on the activity, so this walks activity
+        to snapshot through ``prov:wasGeneratedBy``.
+        """
+        activities = {
+            q.subject
+            for q in self._store.quads_for_pattern(
+                None, ECHOLOT.batch, ox.Literal(batch), GRAPH_PROVENANCE
+            )
+        }
+        found = {
+            q.subject
+            for activity in activities
+            for q in self._store.quads_for_pattern(
+                None, PROV.wasGeneratedBy, activity, GRAPH_PROVENANCE
+            )
+        }
+        return sorted(found, key=lambda n: n.value)
 
     def subjects(self) -> list[ox.NamedNode]:
         """Every subject that has at least one snapshot.

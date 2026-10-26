@@ -25,6 +25,7 @@ from echolot_prov.models import (
     Rights,
     SoftwareAgent,
     Source,
+    StatementRef,
     Target,
     Validation,
     ValidationState,
@@ -38,8 +39,8 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def diff_statements(before: Statements, after: Statements) -> list[str]:
-    """The property IRIs whose values differ between two states of an entity.
+def diff_statements(before: Statements, after: Statements) -> list[StatementRef]:
+    """The claims whose values differ between two states of an entity.
 
     This is the producer's *intent*: what this run set out to change. Core still
     computes the real delta against current state, because only Core knows it,
@@ -47,12 +48,17 @@ def diff_statements(before: Statements, after: Statements) -> list[str]:
 
     Deriving the list rather than hand-maintaining it removes the failure mode
     where an envelope confidently names properties the run never touched.
+
+    A diff keyed by property cannot name a particular claim, so every reference
+    it returns carries a property and no statement identity. A producer that
+    knows which claim it changed passes references itself, through
+    ``.statements()``.
     """
     changed: list[str] = []
     for predicate in set(before) | set(after):
         if set(before.get(predicate, ())) != set(after.get(predicate, ())):
             changed.append(predicate)
-    return sorted(changed)
+    return [StatementRef(property=p) for p in sorted(changed)]
 
 
 def build_envelope(
@@ -63,7 +69,7 @@ def build_envelope(
     started_at: datetime,
     ended_at: datetime,
     method_name: str,
-    statements: Sequence[str] = (),
+    statements: Sequence[StatementRef] = (),
     parameters: Mapping[str, Any] | None = None,
     confidence: float | None = None,
     candidate_rank: int | None = None,
@@ -87,14 +93,22 @@ def build_envelope(
         config_hash=context.config_hash,
     )
 
+    # One stage of a workflow is one run; the workflow itself is the batch.
+    # Inside a Prefect task the task run id identifies this stage and the flow
+    # run id identifies the workflow. Using the flow run id for both would give
+    # every stage the same activity id, and Core would collapse three stages
+    # into one activity. Outside a task there is only the flow, and no batch.
+    activity_id = context.task_id or context.run_id
+    in_a_batch = context.task_id is not None and context.run_id is not None
+
     return Envelope(
         schema_version=SCHEMA_VERSION,
         activity=Activity(
-            id=context.run_id or f"{context.service}-{started_at.isoformat()}",
+            id=activity_id or f"{context.service}-{started_at.isoformat()}",
             type=ActivityType(kind),
             started_at=started_at,
             ended_at=ended_at,
-            batch_of=batch_of,
+            batch_of=batch_of or (context.run_id if in_a_batch else None),
         ),
         agents=[executor, *extra_agents],
         target=Target(subject=subject, statements=list(statements)),
@@ -121,7 +135,7 @@ class ActivityRecorder:
         self._subject = subject
         self._sources: list[Source] = []
         self._agents: list[SoftwareAgent | PersonAgent] = []
-        self._statements: list[str] = []
+        self._statements: list[StatementRef] = []
         self._method: tuple[str, dict[str, Any]] = ("unspecified", {})
         self._confidence: float | None = None
         self._candidate_rank: int | None = None
@@ -181,9 +195,17 @@ class ActivityRecorder:
         """Derive the affected properties by diffing the entity before and after."""
         self._statements = diff_statements(before, after)
 
-    def statements(self, properties: Sequence[str]) -> None:
-        """State the affected properties directly, when no before state exists."""
-        self._statements = list(properties)
+    def statements(self, refs: Sequence[StatementRef | str]) -> None:
+        """Name the affected claims directly, when no before state exists.
+
+        A bare string is taken as a property with no claim identity, which is
+        what a producer has when the backend does not give claims their own
+        identifiers.
+        """
+        self._statements = [
+            ref if isinstance(ref, StatementRef) else StatementRef(property=ref)
+            for ref in refs
+        ]
 
     def validated(
         self,

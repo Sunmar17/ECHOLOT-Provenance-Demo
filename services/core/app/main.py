@@ -116,9 +116,35 @@ def write(body: dict) -> Any:
 
     target = envelope["target"]
 
+    # A 1.1 envelope names claims as objects; a 1.0 envelope names bare property
+    # IRIs. Where a claim carries no identity the two say the same thing, so Core
+    # reads both and keeps working across the version change.
+    #
+    # A claim that *does* carry an identity is a genuinely new capability: the
+    # store holds plain triples, so Core cannot yet place a value against one
+    # particular claim. Refuse that plainly rather than silently dropping the
+    # identity. Phase 1.1b implements it.
+    declared_entries = target.get("statements", [])
+    identified = [
+        entry
+        for entry in declared_entries
+        if isinstance(entry, dict) and entry.get("statement")
+    ]
+    if identified:
+        return _errors(
+            [
+                validation.Error(
+                    "/envelope/target/statements",
+                    "this Core cannot yet write a value against a named claim; "
+                    f"{len(identified)} of {len(declared_entries)} statements "
+                    "carry an identity. Phase 1.1b adds it",
+                )
+            ]
+        )
+
     # The envelope must describe this write, or the provenance it produces is a
     # confident account of something that did not happen.
-    declared = set(target.get("statements", []))
+    declared = set(provenance.declared_properties(target))
     supplied = set(statements)
     if declared != supplied:
         return _errors(
@@ -236,3 +262,31 @@ def get_snapshot(uri: str = Query(...)) -> Any:
         # single long string. Byte-identical to what the producer sent.
         "envelope": json.loads(stored) if stored else None,
     }
+
+
+@app.get("/batch")
+def get_batch(id: str = Query(...)) -> Any:
+    """Every snapshot one workflow run produced, newest first.
+
+    This is what makes a workflow traceable. A batch spans stages and can span
+    subjects, so each row names its own subject.
+    """
+    rows = []
+    for snapshot in store.snapshots_in_batch(id):
+        properties = store.properties_of(snapshot)
+
+        def one(predicate: str, props: dict = properties) -> str | None:
+            values = props.get(predicate)
+            return values[0].value if values else None
+
+        rows.append(
+            {
+                "snapshot": snapshot.value,
+                "subject": one(PROV.specializationOf.value),
+                "generated_at": one(PROV.generatedAtTime.value),
+                "description": one(DCTERMS.description.value),
+                "activity": one(PROV.wasGeneratedBy.value),
+            }
+        )
+    rows.sort(key=lambda r: (r["generated_at"] or "", r["snapshot"]), reverse=True)
+    return {"batch": id, "snapshots": rows}

@@ -10,6 +10,8 @@ dependencies = [
     # `if-necessary-or-explicit` mode permits pre-releases for this package only.
     # The committed uv.lock freezes the build actually resolved.
     "prefect>=3.7.5.dev5",
+    # Serves POST /run, the trigger the curator page calls.
+    "fastapi[standard]>=0.115",
 ]
 
 [build-system]
