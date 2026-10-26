@@ -61,6 +61,14 @@ predicate points at those instead and the RDF shape does not change. That
 mirrors the headroom already built into ``Target.statements``.
 """
 
+STORED_ENVELOPE = ECHOLOT.envelope
+"""The envelope exactly as the producer sent it, kept as compact JSON.
+
+Core also converts the envelope into triples. This keeps the original as well,
+so a curator can see the producer's own words rather than Core's reading of
+them. The two cannot drift, because a released snapshot is never rewritten.
+"""
+
 GRAPH_DATA = NamedNode(f"{DEMO_BASE}/graph/data")
 GRAPH_PROVENANCE = NamedNode(f"{DEMO_BASE}/graph/provenance")
 GRAPH_AGENTS_SOURCES = NamedNode(f"{DEMO_BASE}/graph/agents-sources")

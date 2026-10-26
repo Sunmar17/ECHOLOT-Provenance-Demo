@@ -126,3 +126,18 @@ class Store:
             g.value: sum(1 for _ in self._store.quads_for_pattern(None, None, None, g))
             for g in NAMED_GRAPHS
         }
+
+    def subjects(self) -> list[ox.NamedNode]:
+        """Every subject that has at least one snapshot.
+
+        The UI opens with this, so a curator sees real data instead of an empty
+        box. A subject with no snapshot cannot exist: nothing is written
+        without provenance (invariant 4).
+        """
+        found = {
+            q.object
+            for q in self._store.quads_for_pattern(
+                None, PROV.specializationOf, None, GRAPH_PROVENANCE
+            )
+        }
+        return sorted(found, key=lambda n: n.value)

@@ -8,6 +8,7 @@ Two tiers, per invariant 6: one activity and one snapshot record per run, with
 lightweight per-statement links. Never one ``prov:Activity`` per triple.
 """
 
+import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ from app.namespaces import (
     OCO,
     PROV,
     RDF,
+    STORED_ENVELOPE,
     XSD,
     mint_activity,
     mint_agent,
@@ -195,6 +197,14 @@ def snapshot_triples(
         (snapshot, PROV.wasGeneratedBy, activity_node),
         (snapshot, DCTERMS.description, _text(describe(envelope))),
         (snapshot, OCO.hasUpdateQuery, _text(update_query)),
+        # The producer's own words, kept verbatim beside Core's reading of them.
+        # Sorted keys and no spaces, so the same envelope always stores the same
+        # bytes. The term object escapes it; never format JSON into a query.
+        (
+            snapshot,
+            STORED_ENVELOPE,
+            _text(json.dumps(envelope, sort_keys=True, separators=(",", ":"))),
+        ),
         (activity_node, RDF.type, PROV.Activity),
         (activity_node, ECHOLOT.activityType, _text(activity["type"])),
         (activity_node, PROV.startedAtTime, _datetime(activity["started_at"])),

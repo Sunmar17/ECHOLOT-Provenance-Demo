@@ -9,15 +9,24 @@ format, and the committed JSON Schema would never run. Invariant 3 says Core
 validates against that schema, so validation is ours to do.
 """
 
+import json
 import os
+from pathlib import Path
 from typing import Any
 
 import pyoxigraph as ox
 from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app import provenance, reconstruct, validation
-from app.namespaces import is_absolute_iri
+from app.namespaces import (
+    DCTERMS,
+    OCO,
+    PROV,
+    STORED_ENVELOPE,
+    is_absolute_iri,
+)
 from app.store import Store
 
 _PLAIN_STRING = "http://www.w3.org/2001/XMLSchema#string"
@@ -29,6 +38,17 @@ app = FastAPI(
 )
 
 store = Store(os.environ.get("ECHOLOT_STORE_PATH") or None)
+
+# The curator UI: plain HTML and fetch, served from this package. Mounted last
+# in the file so every API route is registered before it.
+UI_DIR = Path(__file__).parent / "ui"
+app.mount("/ui", StaticFiles(directory=UI_DIR, html=True), name="ui")
+
+
+@app.get("/")
+def root() -> Any:
+    """Send a person who opens the bare host to the page they want."""
+    return RedirectResponse("/ui/")
 
 
 # ------------------------------------------------------------------- terms
@@ -174,4 +194,45 @@ def get_reconstruct(subject: str = Query(...), at: str = Query(...)) -> Any:
             ({"predicate": p.value, "object": term_to_json(o)} for p, o in state),
             key=lambda row: (row["predicate"], row["object"]["value"]),
         ),
+    }
+
+
+@app.get("/subjects")
+def get_subjects() -> Any:
+    """Every subject that has provenance. The UI's starting point."""
+    return {"subjects": [s.value for s in store.subjects()]}
+
+
+@app.get("/snapshot")
+def get_snapshot(uri: str = Query(...)) -> Any:
+    """One snapshot in full, including the envelope its producer sent.
+
+    Separate from ``/history`` so the timeline stays small: a full envelope is
+    about a kilobyte, and a curator only wants one at a time.
+    """
+    if not is_absolute_iri(uri):
+        return _errors(
+            [validation.Error("/uri", "snapshot uri must be an absolute IRI")]
+        )
+
+    properties = store.properties_of(ox.NamedNode(uri))
+    if not properties:
+        return JSONResponse(
+            status_code=404,
+            content={"errors": [{"path": "/uri", "message": "no such snapshot"}]},
+        )
+
+    def one(predicate: str) -> str | None:
+        values = properties.get(predicate)
+        return values[0].value if values else None
+
+    stored = one(STORED_ENVELOPE.value)
+    return {
+        "snapshot": uri,
+        "generated_at": one(PROV.generatedAtTime.value),
+        "description": one(DCTERMS.description.value),
+        "update_query": one(OCO.hasUpdateQuery.value),
+        # Parsed, so the page can show it as structured JSON rather than a
+        # single long string. Byte-identical to what the producer sent.
+        "envelope": json.loads(stored) if stored else None,
     }

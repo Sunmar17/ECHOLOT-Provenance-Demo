@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECHOLOT Curator</title>
+<style>
+/* Plain CSS. No framework and no build step, per CLAUDE.md. */
+:root {
+  --paper: #f5f7f8; --panel: #fff; --ink: #16222b; --ink-2: #5b6b76;
+  --line: #d3dde3; --accent: #0d5c7a; --accent-soft: #e4f0f6;
+  --software: #2f6b52; --person: #8a5300;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+header {
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: 14px 20px;
+}
+h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+header p { margin: 3px 0 0; color: var(--ink-2); font-size: 13px; }
+
+.columns { display: grid; grid-template-columns: 260px 1fr 1fr; gap: 1px;
+  background: var(--line); min-height: calc(100vh - 62px); }
+.col { background: var(--panel); padding: 16px; min-width: 0; }
+h2 { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-2); margin: 0 0 12px; font-weight: 600; }
+
+.item { border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px;
+  margin-bottom: 8px; cursor: pointer; background: var(--panel); width: 100%;
+  text-align: left; font: inherit; color: inherit; display: block; }
+.item:hover { border-color: var(--accent); }
+.item[aria-selected="true"] { border-color: var(--accent);
+  background: var(--accent-soft); }
+.item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.name { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.meta { color: var(--ink-2); font-size: 12px; margin-top: 4px; }
+
+.tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px;
+  background: var(--accent-soft); color: var(--accent); margin-right: 5px; }
+.tag.software { background: #e4efe9; color: var(--software); }
+.tag.person { background: #fbeeda; color: var(--person); }
+
+.link { background: none; border: 0; padding: 0; margin-top: 8px; cursor: pointer;
+  color: var(--accent); font: inherit; font-size: 12px; text-decoration: underline; }
+
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+td { border-bottom: 1px solid var(--line); padding: 7px 8px; vertical-align: top; }
+td.k { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
+  width: 45%; word-break: break-all; }
+td.v { font-weight: 600; }
+
+.hint { color: var(--ink-2); font-size: 13px; }
+.at { font-family: var(--mono); font-size: 12px; color: var(--accent);
+  background: var(--accent-soft); padding: 5px 8px; border-radius: 3px;
+  margin-bottom: 12px; display: block; }
+pre { background: var(--paper); border: 1px solid var(--line); border-radius: 4px;
+  padding: 12px; font-family: var(--mono); font-size: 11.5px; overflow-x: auto;
+  margin: 0; white-space: pre-wrap; word-break: break-word; }
+dialog { border: 1px solid var(--line); border-radius: 6px; padding: 0;
+  max-width: 760px; width: 92vw; }
+dialog::backdrop { background: rgba(16, 34, 43, 0.4); }
+.dlg-head { display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.dlg-body { padding: 16px; max-height: 70vh; overflow-y: auto; }
+@media (max-width: 860px) { .columns { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ECHOLOT Curator</h1>
+  <p>Pick a subject. Pick a moment in its history. See what it said then.</p>
+</header>
+
+<div class="columns">
+  <section class="col">
+    <h2>Subjects</h2>
+    <div id="subjects"><p class="hint">Loading&hellip;</p></div>
+  </section>
+
+  <section class="col">
+    <h2>History</h2>
+    <div id="timeline"><p class="hint">Choose a subject.</p></div>
+  </section>
+
+  <section class="col">
+    <h2>State at that time</h2>
+    <div id="state"><p class="hint">Choose a snapshot.</p></div>
+  </section>
+</div>
+
+<dialog id="details">
+  <div class="dlg-head">
+    <strong>Envelope, as the producer sent it</strong>
+    <button class="link" onclick="document.getElementById('details').close()">Close</button>
+  </div>
+  <div class="dlg-body"><pre id="details-body"></pre></div>
+</dialog>
+
+<script>
+// Three endpoints: /subjects, /history, /reconstruct. /snapshot is fetched
+// only when a curator asks for details, because an envelope is about a
+// kilobyte and the timeline should stay quick.
+const el = (id) => document.getElementById(id);
+const get = async (path, params) =>
+  (await fetch(path + "?" + new URLSearchParams(params))).json();
+
+let subject = null;
+
+function shortName(iri) {
+  return iri.split("/").slice(-2).join("/");
+}
+
+// Known vocabularies, shown the way a curator would say them. The full IRI
+// stays available as a tooltip, so nothing is hidden, only shortened.
+const PREFIXES = {
+  "http://purl.org/dc/terms/": "dcterms:",
+  "http://www.w3.org/ns/prov#": "prov:",
+  "https://w3id.org/oc/ontology/": "oco:",
+};
+
+function shortProperty(iri) {
+  for (const [base, prefix] of Object.entries(PREFIXES)) {
+    if (iri.startsWith(base)) return prefix + iri.slice(base.length);
+  }
+  return iri;
+}
+
+async function loadSubjects() {
+  const { subjects } = await (await fetch("/subjects")).json();
+  if (!subjects.length) {
+    el("subjects").innerHTML =
+      '<p class="hint">Nothing written yet. Run the enrich flow first.</p>';
+    return;
+  }
+  el("subjects").innerHTML = "";
+  for (const iri of subjects) {
+    const button = document.createElement("button");
+    button.className = "item";
+    button.innerHTML = '<div class="name">' + shortName(iri) + "</div>";
+    button.onclick = () => selectSubject(iri, button);
+    el("subjects").append(button);
+  }
+}
+
+async function selectSubject(iri, button) {
+  subject = iri;
+  for (const other of document.querySelectorAll("#subjects .item")) {
+    other.setAttribute("aria-selected", String(other === button));
+  }
+  el("state").innerHTML = '<p class="hint">Choose a snapshot.</p>';
+
+  const { snapshots } = await get("/history", { subject: iri });
+  el("timeline").innerHTML = "";
+
+  snapshots.forEach((snap, index) => {
+    const human = snap.agents.some((a) => a.includes("orcid.org"));
+    const row = document.createElement("div");
+    row.className = "item";
+    row.innerHTML =
+      '<div><span class="tag ' + (human ? "person" : "software") + '">' +
+        (human ? "person" : "software") + "</span>" +
+      '<span class="tag">' + (snapshots.length - index) + "</span></div>" +
+      '<div class="meta">' + snap.description + "</div>" +
+      '<div class="meta">' + snap.generated_at + "</div>";
+
+    // The whole row selects the moment; the link opens the envelope.
+    row.onclick = () => selectSnapshot(snap, row);
+
+    const more = document.createElement("button");
+    more.className = "link";
+    more.textContent = "More details";
+    more.onclick = (event) => {
+      event.stopPropagation();
+      showEnvelope(snap.snapshot);
+    };
+    row.append(more);
+    el("timeline").append(row);
+  });
+}
+
+async function selectSnapshot(snap, row) {
+  for (const other of document.querySelectorAll("#timeline .item")) {
+    other.setAttribute("aria-selected", String(other === row));
+  }
+  // Reconstruct at this snapshot's own time, so the state shown is the state
+  // this snapshot produced, not the state that replaced it.
+  const result = await get("/reconstruct", {
+    subject: subject,
+    at: snap.generated_at,
+  });
+
+  if (!result.statements.length) {
+    el("state").innerHTML = '<p class="hint">Nothing was asserted at this time.</p>';
+    return;
+  }
+  const rows = result.statements
+    .map((s) =>
+      '<tr><td class="k" title="' + s.predicate + '">' +
+      shortProperty(s.predicate) + '</td><td class="v">' +
+      s.object.value + "</td></tr>")
+    .join("");
+  el("state").innerHTML =
+    '<code class="at">as at ' + snap.generated_at + "</code>" +
+    "<table>" + rows + "</table>";
+}
+
+async function showEnvelope(uri) {
+  const detail = await get("/snapshot", { uri: uri });
+  el("details-body").textContent = JSON.stringify(detail.envelope, null, 2);
+  el("details").showModal();
+}
+
+loadSubjects();
+</script>
+</body>
+</html>
