@@ -66,6 +66,21 @@ def term(value: Any) -> dict[str, str]:
     raise TypeError(f"cannot express {type(value).__name__} as an RDF term")
 
 
+def _claim(claim: Mapping[str, Any]) -> dict[str, Any]:
+    """One claim in the shape Core reads: an optional identity and its values."""
+    values = claim.get("values")
+    if not values:
+        raise ValueError("a claim needs at least one property in 'values'")
+    out: dict[str, Any] = {
+        "values": {
+            predicate: [term(v) for v in vals] for predicate, vals in values.items()
+        }
+    }
+    if claim.get("statement"):
+        out["statement"] = str(claim["statement"])
+    return out
+
+
 class CoreError(RuntimeError):
     """Core refused or could not serve a request."""
 
@@ -111,20 +126,32 @@ class CoreClient:
         subject: str,
         statements: Mapping[str, Sequence[Any]],
         envelope: Envelope,
+        *,
+        claims: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Write data and its provenance together. The only write path.
+
+        ``statements`` are plain values on the subject, property to values.
+
+        ``claims`` are values that need an identity of their own, such as one
+        creator among several. Each is a mapping with ``values`` (property to
+        values, set on that claim) and, for a claim that already exists, its
+        ``statement`` IRI. A claim with no ``statement`` is new: Core mints its
+        IRI and returns it in ``claims``, in the order sent.
 
         Returns Core's response, which carries the new snapshot's IRI. Raises
         :class:`CoreValidationError` if Core refused, in which case nothing was
         written to any graph.
         """
-        payload = {
+        payload: dict[str, Any] = {
             "envelope": envelope.model_dump(mode="json", exclude_none=True),
             "statements": {
                 predicate: [term(v) for v in values]
                 for predicate, values in statements.items()
             },
         }
+        if claims:
+            payload["claims"] = [_claim(c) for c in claims]
         if payload["envelope"]["target"]["subject"] != subject:
             raise ValueError(
                 f"subject {subject!r} does not match the envelope's target "

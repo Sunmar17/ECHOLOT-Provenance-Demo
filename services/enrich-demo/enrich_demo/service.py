@@ -10,17 +10,22 @@ Run it beside Core:
 """
 
 import os
-from typing import Any
+from importlib import resources
+from typing import Annotated, Any, Literal
 
-from fastapi import FastAPI
+from echolot_prov.client import CoreValidationError
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from enrich_demo.flow import correct_attribution, curate_entity
+from enrich_demo.flow import correct_value, curate_upload
+from enrich_demo.upload import UploadError, parse_upload, upload_source
 
 app = FastAPI(
     title="ECHOLOT Enrich (demo)",
-    description="Starts the curation workflow. One run is one batch.",
+    description="Runs the curation workflow over an uploaded file. One upload is "
+    "one batch.",
 )
 
 # The page is served by Core on another port, so the browser calls this from a
@@ -37,37 +42,83 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
+SAMPLES = {"person": "person.json", "artifacts": "artifacts.csv"}
+"""The packaged sample uploads. Synthetic; see samples/README.md."""
 
-class RunRequest(BaseModel):
-    name: str = Field(min_length=1)
-    subject: str = Field(min_length=1)
+
+class SampleRequest(BaseModel):
+    sample: Literal["person", "artifacts"]
+    uploader: str | None = None
     core_url: str | None = None
 
 
 class CorrectRequest(BaseModel):
+    """One value a curator replaces, and the snapshot that asserted it."""
+
     subject: str = Field(min_length=1)
-    corrected: str = Field(min_length=1)
     curator: str = Field(min_length=1)
+    property: str = Field(min_length=1)
+    value: str = Field(min_length=1)
+    value_is_iri: bool = False
+    statement: str | None = None
+    """The claim the value sits on; absent for a plain value on the subject."""
+    corrects: str | None = None
+    """The snapshot whose value is being corrected."""
     core_url: str | None = None
 
 
-@app.post("/run")
-def run(request: RunRequest) -> Any:
-    """Run the three-stage workflow and return what each stage produced.
+def _run(filename: str, data: bytes, uploader: str | None, url: str | None) -> Any:
+    """Read the file first, so a bad file is refused before anything is written.
 
-    Declared with ``def`` rather than ``async def`` on purpose: FastAPI then
-    runs it in a worker thread, so a flow run of several seconds does not block
-    the server from answering anything else.
+    Declared as a plain function and called from ``def`` endpoints: FastAPI then
+    runs the endpoint in a worker thread, so a flow run of several seconds does
+    not block the server from answering anything else.
     """
-    return curate_entity(request.name, request.subject, request.core_url)
+    try:
+        records = parse_upload(filename, data)
+    except UploadError as exc:
+        return JSONResponse(status_code=422, content={"errors": [exc.as_dict()]})
+    return curate_upload(records, upload_source(filename, data), uploader or None, url)
+
+
+@app.post("/upload")
+def upload(
+    file: Annotated[UploadFile, File()],
+    uploader: Annotated[str | None, Form()] = None,
+    core_url: Annotated[str | None, Form()] = None,
+) -> Any:
+    """Run the workflow over an uploaded CSV or JSON file."""
+    return _run(file.filename or "upload", file.file.read(), uploader, core_url)
+
+
+@app.post("/upload/sample")
+def upload_sample(request: SampleRequest) -> Any:
+    """Run the workflow over a packaged sample, through the same path as a file."""
+    name = SAMPLES[request.sample]
+    data = resources.files("enrich_demo").joinpath("samples", name).read_bytes()
+    return _run(name, data, request.uploader, request.core_url)
 
 
 @app.post("/correct")
 def correct(request: CorrectRequest) -> Any:
-    """Apply a curator's correction to a subject the workflow produced."""
-    return correct_attribution(
-        request.subject, request.corrected, request.curator, request.core_url
-    )
+    """Apply a curator's correction to one value, plain or on a claim.
+
+    If Core refuses it, Core's own reasons are passed back, so the page can say
+    why instead of reporting a server error.
+    """
+    try:
+        return correct_value(
+            request.subject,
+            request.curator,
+            request.property,
+            request.value,
+            request.value_is_iri,
+            request.statement,
+            request.corrects,
+            request.core_url,
+        )
+    except CoreValidationError as exc:
+        return JSONResponse(status_code=422, content={"errors": exc.errors})
 
 
 @app.get("/health")

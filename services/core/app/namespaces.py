@@ -36,6 +36,7 @@ class Namespace:
 
 
 RDF = Namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+RDFS = Namespace("http://www.w3.org/2000/01/rdf-schema#")
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 PROV = Namespace("http://www.w3.org/ns/prov#")
 DCTERMS = Namespace("http://purl.org/dc/terms/")
@@ -53,12 +54,20 @@ ECHOLOT = Namespace(f"{DEMO_BASE}/ns#")
 """Demo-local vocabulary, for the few relations PROV-O, dcterms and oco lack."""
 
 AFFECTED_STATEMENT = ECHOLOT.affectedStatement
-"""The lightweight per-statement link of invariant 6.
+"""The per-statement link of invariant 6, from a snapshot to what it changed.
 
-Named "statement" rather than "property" deliberately. Today each value is a
-property IRI; if NeoWiki turns out to need statement-instance identity, the same
-predicate points at those instead and the RDF shape does not change. That
-mirrors the headroom already built into ``Target.statements``.
+Points at a claim's IRI when the change was to a claim, and at a property IRI
+when it was to a plain value on the subject. Named "statement" from the start
+so that claims could arrive without changing the RDF shape, which is what
+Phase 1.1b relied on.
+"""
+
+STATEMENT = ECHOLOT.statement
+"""From a subject to one of its claims: ``<subject> echolot:statement <claim>``.
+
+A claim is one value that needs an identity of its own, such as one creator
+among several. Its values sit on the claim node, so a match or a correction can
+attach to that one claim instead of to the subject as a whole.
 """
 
 STORED_ENVELOPE = ECHOLOT.envelope
@@ -97,6 +106,21 @@ def mint_snapshot(subject: str, activity_id: str, ended_at: str) -> NamedNode:
         "\n".join((subject, activity_id, ended_at)).encode("utf-8")
     ).hexdigest()[:16]
     return NamedNode(f"{DEMO_BASE}/snapshot/{digest}")
+
+
+def mint_claim(
+    subject: str, activity_id: str, ended_at: str, position: int
+) -> NamedNode:
+    """The IRI for a new claim, derived from the write that created it.
+
+    Deterministic for the same reason as ``mint_snapshot``: replaying the same
+    envelopes in the same order must reproduce the same claim identities, or a
+    later envelope naming a claim would point at nothing after a rebuild.
+    """
+    digest = hashlib.sha256(
+        "\n".join((subject, activity_id, ended_at, str(position))).encode("utf-8")
+    ).hexdigest()[:16]
+    return NamedNode(f"{DEMO_BASE}/claim/{digest}")
 
 
 def mint_activity(activity_id: str) -> NamedNode:

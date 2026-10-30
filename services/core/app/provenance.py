@@ -5,7 +5,7 @@ return triples and strings, so the Stage 2 port swaps the term class and keeps
 the algorithms.
 
 Two tiers, per invariant 6: one activity and one snapshot record per run, with
-lightweight per-statement links. Never one ``prov:Activity`` per triple.
+per-statement links beneath it. Never one ``prov:Activity`` per triple.
 """
 
 import json
@@ -105,6 +105,21 @@ def compute_delta(
     return Delta(tuple(_sorted(removed)), tuple(_sorted(added)))
 
 
+def merge_deltas(deltas: Iterable[Delta]) -> Delta:
+    """One delta from several, such as the subject's and each of its claims'.
+
+    One write still produces one delta, so it is stored, inverted and replayed
+    as a single unit. Its triples stay apart by subject: a claim's values have
+    the claim as their subject, never the record.
+    """
+    removed: list[Triple] = []
+    added: list[Triple] = []
+    for delta in deltas:
+        removed.extend(delta.removed)
+        added.extend(delta.added)
+    return Delta(tuple(_sorted(removed)), tuple(_sorted(added)))
+
+
 def _sorted(triples: Iterable[Triple]) -> list[Triple]:
     """Deterministic ordering, so the same inputs always produce the same query."""
     return sorted(triples, key=lambda t: (str(t[0]), str(t[1]), str(t[2])))
@@ -158,20 +173,27 @@ def invert(delta: Delta) -> Delta:
 
 
 def declared_properties(target: dict) -> list[str]:
-    """The property IRIs a target names, whichever contract version wrote it.
+    """The property IRIs a target names without naming a particular claim.
 
-    1.0 names bare property IRIs. 1.1 names claim objects carrying a property
-    and, where the backend has one, a claim identity. Reading both here keeps
-    one Core able to serve a producer that has not upgraded yet (invariant 1).
-
-    The claim identity is deliberately not read: Core cannot place a value
-    against one particular claim until Phase 1.1b, and `POST /write` refuses
-    such an envelope rather than dropping the identity silently.
+    1.0 names bare property IRIs. 1.1 names objects carrying a property and,
+    where one exists, a claim identity. Reading both here keeps one Core able to
+    serve a producer that has not upgraded yet (invariant 1). Entries that name
+    a claim are read by ``declared_claims``.
     """
     return [
         entry["property"] if isinstance(entry, dict) else entry
         for entry in target.get("statements", [])
+        if not (isinstance(entry, dict) and entry.get("statement"))
     ]
+
+
+def declared_claims(target: dict) -> set[tuple[str, str]]:
+    """The ``(property, claim IRI)`` pairs a target names. Only 1.1 has them."""
+    return {
+        (entry["property"], entry["statement"])
+        for entry in target.get("statements", [])
+        if isinstance(entry, dict) and entry.get("statement")
+    }
 
 
 def describe(envelope: dict) -> str:
@@ -197,8 +219,14 @@ def snapshot_triples(
     snapshot: ox.NamedNode,
     previous_head: ox.NamedNode | None,
     update_query: str,
+    affected: Iterable[str] | None = None,
 ) -> list[Triple]:
-    """The provenance record for one run: one snapshot, one activity."""
+    """The provenance record for one run: one snapshot, one activity.
+
+    ``affected`` names what the run touched: claim IRIs for claims, property
+    IRIs for plain values. Core passes it because only Core knows the IRI of a
+    claim it has just minted. Without it, the envelope's declarations are used.
+    """
     target = envelope["target"]
     activity = envelope["activity"]
     method = envelope["method"]
@@ -242,10 +270,14 @@ def snapshot_triples(
             (activity_node, ECHOLOT.candidateRank, _integer(method["candidate_rank"]))
         )
 
-    # Lightweight per-statement links (invariant 6), one per declared statement.
+    # Per-statement links (invariant 6): one per claim or property touched.
+    if affected is None:
+        affected = [
+            *declared_properties(target),
+            *(claim for _, claim in declared_claims(target)),
+        ]
     out.extend(
-        (snapshot, AFFECTED_STATEMENT, ox.NamedNode(iri))
-        for iri in declared_properties(target)
+        (snapshot, AFFECTED_STATEMENT, ox.NamedNode(iri)) for iri in set(affected)
     )
 
     for agent in envelope["agents"]:
@@ -298,13 +330,17 @@ def agent_source_triples(envelope: dict) -> list[Triple]:
 
 
 def build_write_update(
-    envelope: dict, delta: Delta, previous_head: ox.NamedNode | None
+    envelope: dict,
+    delta: Delta,
+    previous_head: ox.NamedNode | None,
+    affected: Iterable[str] | None = None,
 ) -> tuple[ox.NamedNode, str]:
     """The snapshot IRI and the single update that commits data and provenance.
 
     One string, one ``Store.apply`` call. That single update is the transaction
     boundary invariant 4 requires: the data change and its provenance become
-    real together or not at all.
+    real together or not at all. Claims are part of the same delta, so a new
+    claim, its values and its provenance land together too.
     """
     activity = envelope["activity"]
     snapshot = mint_snapshot(
@@ -317,7 +353,7 @@ def build_write_update(
         _data_block(
             "INSERT",
             GRAPH_PROVENANCE,
-            snapshot_triples(envelope, snapshot, previous_head, update_query),
+            snapshot_triples(envelope, snapshot, previous_head, update_query, affected),
         ),
         _data_block("INSERT", GRAPH_AGENTS_SOURCES, agent_source_triples(envelope)),
     ]

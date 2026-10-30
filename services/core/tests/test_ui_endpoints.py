@@ -21,7 +21,7 @@ def write_one(client, name: str = "reconciliation-software"):
 
 
 def test_a_fresh_store_lists_no_subjects(client):
-    assert client.get("/subjects").json() == {"subjects": []}
+    assert client.get("/subjects").json() == {"subjects": [], "labels": {}}
 
 
 def test_a_written_subject_appears(client):
@@ -161,9 +161,20 @@ def test_a_snapshot_with_no_batch_reports_none(client):
     assert snapshots[0]["batch"] is None
 
 
-def test_the_page_offers_a_correction_control(client):
-    """A curator must be able to correct from the page, not only a terminal."""
+def test_the_page_corrects_beside_each_snapshot(client):
+    """A correction sits on the value a snapshot wrote, and says which snapshot."""
     html = client.get("/ui/").text
-    assert "correctform" in html
+    assert "correctform" not in html, "no general correction bar"
     assert "/correct" in html
-    assert "Apply correction" in html
+    assert 'fix.textContent = "Correct"' in html
+    assert "corrects: snap.snapshot" in html
+    assert "statement: change.statement" in html
+
+
+def test_the_page_offers_an_upload_and_both_samples(client):
+    """WP4: a curator uploads a CSV or JSON file, one record or a batch."""
+    html = client.get("/ui/").text
+    assert 'type="file"' in html
+    assert "/upload" in html
+    assert "/upload/sample" in html
+    assert '"person"' in html and '"artifacts"' in html

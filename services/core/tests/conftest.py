@@ -15,9 +15,9 @@ from fastapi.testclient import TestClient
 REPO = Path(__file__).resolve().parents[3]
 FIXTURES = REPO / "packages" / "echolot-prov" / "fixtures"
 
-# Core is tested against the version whose payload it can apply. A 1.1 envelope
-# naming a claim identity is refused on purpose until Phase 1.1b, and
-# test_version_guard.py covers that case directly.
+# The shared corpus is written as plain values, which both versions express.
+# A 1.1 envelope naming a claim needs that claim to exist first, so fixtures
+# cannot be written cold; test_claims.py builds claims up and covers 1.1 directly.
 CORE_VERSION = "1.0"
 
 

@@ -116,6 +116,56 @@ def test_write_posts_envelope_and_statements_together():
     assert seen["envelope"]["target"]["subject"] == SUBJECT
 
 
+def test_claims_are_posted_with_their_identity_only_when_they_have_one():
+    """A new claim has no IRI yet; Core mints it. An existing one is named."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json={"claims": ["https://core/claim/1"]})
+
+    claim = "https://demo.echolot.eu/claim/a1"
+    fake_core(handler).write(
+        SUBJECT,
+        {},
+        an_envelope(),
+        claims=[
+            {"values": {CREATOR: ["Okafor, D."]}},
+            {"statement": iri(claim), "values": {CREATOR: [iri("https://x.org/Q1")]}},
+        ],
+    )
+
+    new, named = seen["claims"]
+    assert new == {"values": {CREATOR: [{"type": "literal", "value": "Okafor, D."}]}}
+    assert named == {
+        "statement": claim,
+        "values": {CREATOR: [{"type": "uri", "value": "https://x.org/Q1"}]},
+    }
+
+
+def test_no_claims_means_no_claims_key():
+    """A producer that never uses claims posts exactly what it posted before."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json={})
+
+    fake_core(handler).write(SUBJECT, {CREATOR: ["x"]}, an_envelope())
+    assert "claims" not in seen
+
+
+def test_a_claim_with_no_values_is_refused_before_the_request():
+    with pytest.raises(ValueError, match="at least one property"):
+        fake_core(lambda r: httpx.Response(200)).write(
+            SUBJECT, {}, an_envelope(), claims=[{"values": {}}]
+        )
+
+
 def test_what_is_posted_satisfies_the_committed_schema():
     """The wire form, not just the model, must match the contract."""
     validate_against_committed_schema(an_envelope())

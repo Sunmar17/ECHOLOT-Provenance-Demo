@@ -1,74 +1,46 @@
 {
-  "_comment": "A local stand-in for a Wikidata reconciliation service. Invariant 9: the demo makes no external network calls, so candidates come from here. Shaped like a dump extract: a queried name maps to ranked candidates, and each candidate carries the facts the enrichment stage copies across. 'Rubens' is deliberately ambiguous, which is what gives the curator something to correct.",
+  "_comment": "A local stand-in for a Wikidata reconciliation service. Invariant 9: the demo makes no external network calls at run time, so candidates come from here. Every entity id, GND id and VIAF id below was fetched from Wikidata on the _snapshot date (wbsearchentities, then wbgetentities with P227 for GND and P214 for VIAF), not written from memory. The scores are this stand-in's own, as a real reconciliation service returns its own. 'Vera Molnár' is deliberately ambiguous: Wikidata search ranks a German actress above the Hungarian artist, which is the case a curator has to catch.",
   "_source": "https://www.wikidata.org/",
-  "_snapshot": "2026-02-01",
-  "candidates": {
-    "Rubens": [
-      {
-        "id": "https://www.wikidata.org/entity/Q29190188",
-        "label": "Workshop of Rubens",
-        "score": 0.71,
-        "facts": {
-          "http://purl.org/dc/terms/created": "1600-01-01",
-          "http://purl.org/dc/terms/spatial": "Antwerp"
-        }
-      },
-      {
-        "id": "https://www.wikidata.org/entity/Q5599",
-        "label": "Peter Paul Rubens",
-        "score": 0.64,
-        "facts": {
-          "http://purl.org/dc/terms/created": "1577-06-28",
-          "http://purl.org/dc/terms/spatial": "Siegen"
-        }
-      }
-    ],
-    "Peter Paul Rubens": [
-      {
-        "id": "https://www.wikidata.org/entity/Q5599",
-        "label": "Peter Paul Rubens",
-        "score": 0.98,
-        "facts": {
-          "http://purl.org/dc/terms/created": "1577-06-28",
-          "http://purl.org/dc/terms/spatial": "Siegen"
-        }
-      }
-    ],
-    "Rembrandt": [
-      {
-        "id": "https://www.wikidata.org/entity/Q5598",
-        "label": "Rembrandt",
-        "score": 0.97,
-        "facts": {
-          "http://purl.org/dc/terms/created": "1606-07-15",
-          "http://purl.org/dc/terms/spatial": "Leiden"
-        }
-      }
-    ],
-    "Jan Brueghel": [
-      {
-        "id": "https://www.wikidata.org/entity/Q213215",
-        "label": "Jan Brueghel the Elder",
-        "score": 0.69,
-        "facts": {
-          "http://purl.org/dc/terms/created": "1568-01-01",
-          "http://purl.org/dc/terms/spatial": "Brussels"
-        }
-      },
-      {
-        "id": "https://www.wikidata.org/entity/Q520313",
-        "label": "Jan Brueghel the Younger",
-        "score": 0.66,
-        "facts": {
-          "http://purl.org/dc/terms/created": "1601-09-13",
-          "http://purl.org/dc/terms/spatial": "Antwerp"
-        }
-      }
-    ]
+  "_snapshot": "2026-10-29",
+  "entities": {
+    "Q221450": {"label": "Luciano Berio", "description": "Italian composer (1925-2003)", "gndId": "118509594", "viafId": "110843905"},
+    "Q92760": {"label": "Claude Shannon", "description": "American mathematician and information theorist (1916-2001)", "gndId": "119110792", "viafId": "41924253"},
+    "Q706362": {"label": "William Forsythe", "description": "American choreographer (born 1949)", "gndId": "119088959", "viafId": "96534980"},
+    "Q309648": {"label": "Charles Ives", "description": "American modernist composer (1874-1954)", "gndId": "118556142", "viafId": "39562133"},
+    "Q78620": {"label": "Herbert W. Franke", "description": "Austrian scientist and writer (1927-2022)", "gndId": "118702912", "viafId": "61608872"},
+    "Q158056": {"label": "Nam June Paik", "description": "American video art pioneer (1932-2006)", "gndId": "118739018", "viafId": "112271274"},
+    "Q1658002": {"label": "Vera Molnár", "description": "Hungarian artist (1924-2023)", "gndId": "119255138", "viafId": "61645784"},
+    "Q2513339": {"label": "Vera Molnar", "description": "German actress (1923-1986)", "gndId": "103150138X", "viafId": "86359068"},
+    "Q154556": {"label": "Karlheinz Stockhausen", "description": "German composer (1928-2007)", "gndId": "118618350", "viafId": "102762014"}
   },
-  "_required_properties": [
-    "http://purl.org/dc/terms/creator",
-    "http://purl.org/dc/terms/created",
-    "http://purl.org/dc/terms/spatial"
-  ]
+  "names": {
+    "Luciano Berio": [{"id": "Q221450", "score": 0.97}],
+    "L. Berio": [{"id": "Q221450", "score": 0.82}],
+    "Claude Shannon": [{"id": "Q92760", "score": 0.96}],
+    "Claude E. Shannon": [{"id": "Q92760", "score": 0.93}],
+    "William Forsythe": [{"id": "Q706362", "score": 0.88}],
+    "Charles Ives": [{"id": "Q309648", "score": 0.95}],
+    "Herbert W. Franke": [{"id": "Q78620", "score": 0.94}],
+    "Nam June Paik": [{"id": "Q158056", "score": 0.98}],
+    "Vera Molnár": [{"id": "Q2513339", "score": 0.74}, {"id": "Q1658002", "score": 0.72}],
+    "Karlheinz Stockhausen": [{"id": "Q154556", "score": 0.97}],
+    "K. Stockhausen": [{"id": "Q154556", "score": 0.79}]
+  },
+  "_required_properties": {
+    "agent": [
+      "https://demo.echolot.eu/sample/ns#familyName",
+      "https://demo.echolot.eu/sample/ns#gndId",
+      "https://demo.echolot.eu/sample/ns#wikidataId"
+    ],
+    "item": [
+      "http://purl.org/dc/terms/title",
+      "http://purl.org/dc/terms/date",
+      "http://purl.org/dc/terms/creator"
+    ],
+    "work": [
+      "http://purl.org/dc/terms/title",
+      "http://purl.org/dc/terms/date",
+      "http://purl.org/dc/terms/creator"
+    ]
+  }
 }

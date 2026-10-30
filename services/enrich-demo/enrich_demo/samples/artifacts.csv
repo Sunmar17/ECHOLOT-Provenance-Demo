@@ -1,0 +1,21 @@
+kind,id,type,classification,title,year,personList,signature
+work,92001,,Musikstück,Sequenza III,,"Berio, Luciano",SA-W-0001
+work,92002,,Musikstück,Gesang der Jünglinge,,"Stockhausen, Karlheinz",SA-W-0002
+work,92003,,Musikstück,The Unanswered Question,1908,"Ives, Charles",SA-W-0003
+work,92004,,Musikstück,Central Park in the Dark,1906,"Ives, Charles",SA-W-0004
+work,92005,,Installation,TV Buddha,1974,"Paik, Nam June",SA-W-0005
+work,92006,,Text,A Mathematical Theory of Communication,1948,"Shannon, Claude E.",SA-W-0006
+work,92007,,Klanginstallation,Klangraum IV,1998,"Hartmann, Lena [Lenka H.]",SA-W-0007
+work,92008,,Videoarbeit,Lichtfeld,2003,Studio Kreisel,SA-W-0008
+work,92009,,Computergrafik,Signal / Noise,2011,"Okafor, D.",SA-W-0009
+work,92010,,Musikstück,Ohne Titel (Tonband),,,SA-W-0010
+item,91001,Audio,,Konzertmitschnitt: Sequenza III,1987,L. Berio,SA-I-0001
+item,91002,Audio,,Tonbandkopie: Gesang der Jünglinge,1991,"Stockhausen, K.",SA-I-0002
+item,91003,Object,,Plotterzeichnung (Reproduktion),1985,"Molnar, Vera",SA-I-0003
+item,91004,Publication,,Vortragsmanuskript zur Computerkunst,1979,"Franke, Herbert W.",SA-I-0004
+item,91005,Video,,Probenvideo,2004,"Forsythe, William / Okafor, D.",SA-I-0005
+item,91006,Object,,Ausstellungsfoto: TV Buddha,1977,"Paik, Nam June",SA-I-0006
+item,91007,Publication,,Sonderdruck: A Mathematical Theory of Communication,1949,"Shannon, Claude",SA-I-0007
+item,91008,Object,,Festivalprogramm,1987,"Berio, Luciano / Stockhausen, Karlheinz",SA-I-0008
+item,91009,Audio,,"Interviewaufnahme, Teil 2",2009,"Hartmann, Lena",SA-I-0009
+item,91010,Object,,Mappe mit Notizen,,,SA-I-0010

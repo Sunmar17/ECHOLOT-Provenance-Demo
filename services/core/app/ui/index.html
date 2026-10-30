@@ -9,7 +9,7 @@
 :root {
   --paper: #f5f7f8; --panel: #fff; --ink: #16222b; --ink-2: #5b6b76;
   --line: #d3dde3; --accent: #0d5c7a; --accent-soft: #e4f0f6;
-  --software: #2f6b52; --person: #8a5300;
+  --software: #2f6b52; --person: #8a5300; --bad: #8a3d4e;
   --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 * { box-sizing: border-box; }
@@ -38,7 +38,9 @@ h2 { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
   background: var(--accent-soft); }
 .item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.name { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.label { font-weight: 600; font-size: 14px; }
+.name { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
+  word-break: break-all; }
 .meta { color: var(--ink-2); font-size: 12px; margin-top: 4px; }
 
 .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px;
@@ -49,11 +51,42 @@ h2 { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
 .link { background: none; border: 0; padding: 0; margin-top: 8px; cursor: pointer;
   color: var(--accent); font: inherit; font-size: 12px; text-decoration: underline; }
 
+/* What a snapshot changed, one line per value, each correctable. */
+.changes { list-style: none; margin: 8px 0 0; padding: 8px 0 0;
+  border-top: 1px dashed var(--line); font-size: 12.5px; }
+.changes li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+  padding: 2px 0; }
+.op { font-family: var(--mono); font-weight: 700; width: 12px; }
+.op.add { color: var(--software); }
+.op.del { color: var(--bad); }
+.k { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+.v { font-weight: 600; word-break: break-word; }
+.claim { font-family: var(--mono); font-size: 11px; color: var(--accent);
+  background: var(--accent-soft); padding: 0 6px; border-radius: 3px; }
+.fix { margin-left: auto; font: inherit; font-size: 11.5px; font-weight: 600;
+  padding: 2px 9px; border-radius: 4px; border: 1px solid var(--person);
+  background: transparent; color: var(--person); cursor: pointer; }
+.fix:hover { background: #fbeeda; }
+.editor { display: flex; gap: 6px; width: 100%; margin: 4px 0 2px; }
+.editor input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px;
+  padding: 4px 7px; border: 1px solid var(--person); border-radius: 4px; }
+.editor button { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px;
+  border-radius: 4px; border: 0; cursor: pointer; }
+.editor .apply { background: var(--person); color: #fff; }
+.editor .cancel { background: var(--paper); color: var(--ink-2); }
+.err { color: var(--bad); font-size: 12px; width: 100%; }
+
+.about { font-size: 13px; margin-bottom: 12px; padding: 8px 10px;
+  border-left: 3px solid var(--accent); background: var(--accent-soft); }
+.about code { display: block; font-family: var(--mono); font-size: 11px;
+  color: var(--ink-2); word-break: break-all; }
+
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 td { border-bottom: 1px solid var(--line); padding: 7px 8px; vertical-align: top; }
-td.k { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
-  width: 45%; word-break: break-all; }
-td.v { font-weight: 600; }
+td.k { width: 45%; word-break: break-all; }
+td.v { font-weight: 600; word-break: break-word; }
+h3 { font-size: 12px; margin: 16px 0 4px; font-weight: 600; color: var(--ink-2); }
+h3 .claim { margin-left: 4px; }
 
 .hint { color: var(--ink-2); font-size: 13px; }
 
@@ -67,10 +100,11 @@ td.v { font-weight: 600; }
   border: 0; border-radius: 4px; background: var(--accent); color: #fff;
   cursor: pointer; }
 .runbar button:disabled { opacity: 0.55; cursor: progress; }
+.runbar button.sample { background: transparent; color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent); }
+.runbar input[type="file"] { min-width: 0; padding: 4px; }
 .status { font-size: 12.5px; color: var(--ink-2); }
-.status.bad { color: #8a3d4e; }
-.correctbar { background: var(--paper); }
-.correctbar button { background: var(--person); }
+.status.bad { color: var(--bad); }
 
 .batch { font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
 .item.fresh { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
@@ -93,25 +127,18 @@ dialog::backdrop { background: rgba(16, 34, 43, 0.4); }
 
 <header>
   <h1>ECHOLOT Curator</h1>
-  <p>Pick a subject. Pick a moment in its history. See what it said then.</p>
+  <p>Pick a subject. Pick a moment in its history. Correct a value where it was made.</p>
 </header>
 
-<form class="runbar" id="runform">
-  <label for="name">Name</label>
-  <input id="name" name="name" value="Rubens" required>
-  <label for="subject">Subject</label>
-  <input id="subject" name="subject" value="https://demo.echolot.eu/entity/object/1" required>
-  <button id="runbtn" type="submit">Run workflow</button>
-  <span class="status" id="status">Three stages: reconcile, enrich, quality check.</span>
-</form>
-
-<form class="runbar correctbar" id="correctform">
-  <label for="corrected">Correct creator to</label>
-  <input id="corrected" name="corrected" value="Peter Paul Rubens" required>
-  <label for="curator">as</label>
-  <input id="curator" name="curator" value="https://orcid.org/0000-0002-1825-0097" required>
-  <button id="correctbtn" type="submit">Apply correction</button>
-  <span class="status" id="correctstatus">A person, not a workflow. No batch id.</span>
+<form class="runbar" id="uploadform">
+  <label for="file">File</label>
+  <input id="file" name="file" type="file" accept=".json,.csv,application/json,text/csv">
+  <button id="uploadbtn" type="submit">Run on file</button>
+  <button id="sampleperson" class="sample" type="button">Sample: one person (JSON)</button>
+  <button id="sampleartifacts" class="sample" type="button">Sample: 20 artifacts (CSV)</button>
+  <label for="you">You (ORCID)</label>
+  <input id="you" name="you" value="https://orcid.org/0000-0002-1825-0097">
+  <span class="status" id="status">Each record: import, reconcile, enrich (people only), quality check.</span>
 </form>
 
 <div class="columns">
@@ -122,6 +149,7 @@ dialog::backdrop { background: rgba(16, 34, 43, 0.4); }
 
   <section class="col">
     <h2>History</h2>
+    <div id="about"></div>
     <div id="timeline"><p class="hint">Choose a subject.</p></div>
   </section>
 
@@ -140,18 +168,27 @@ dialog::backdrop { background: rgba(16, 34, 43, 0.4); }
 </dialog>
 
 <script>
-// Three endpoints: /subjects, /history, /reconstruct. /snapshot is fetched
-// only when a curator asks for details, because an envelope is about a
-// kilobyte and the timeline should stay quick.
+// Core endpoints: /subjects, /history, /reconstruct, and /snapshot only when a
+// curator asks for details, because an envelope is about a kilobyte. Corrections
+// go to the enrich service's /correct. Every value from the data is escaped:
+// an uploaded file is not trusted text.
 const el = (id) => document.getElementById(id);
 const get = async (path, params) =>
   (await fetch(path + "?" + new URLSearchParams(params))).json();
+const esc = (text) =>
+  String(text).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+const CREATOR = "http://purl.org/dc/terms/creator";
+const FAR_FUTURE = "2999-01-01T00:00:00Z";
 
 let subject = null;
+let labels = {};
+let current = {};  // claim IRI ("" for the subject itself) -> property -> values
 let freshBatch = null;
 
-// The enrich service runs the workflow. Core is a store and does not run
-// flows, which is why the trigger lives on another port.
+// The enrich service runs workflows and corrections. Core is a store and does
+// not run flows, which is why those live on another port.
 const ENRICH_URL =
   new URLSearchParams(location.search).get("enrich") || "http://127.0.0.1:8001";
 
@@ -164,7 +201,10 @@ function shortName(iri) {
 const PREFIXES = {
   "http://purl.org/dc/terms/": "dcterms:",
   "http://www.w3.org/ns/prov#": "prov:",
+  "http://www.w3.org/2000/01/rdf-schema#": "rdfs:",
   "https://w3id.org/oc/ontology/": "oco:",
+  "https://demo.echolot.eu/sample/ns#": "sample:",
+  "http://www.wikidata.org/entity/": "wd:",
 };
 
 function shortProperty(iri) {
@@ -174,21 +214,45 @@ function shortProperty(iri) {
   return iri;
 }
 
+const shortValue = (term) => (term.type === "uri" ? shortProperty(term.value) : term.value);
+const shortClaim = (iri) => "claim " + iri.split("/").pop().slice(0, 6);
+
+// A claim is named by the creator it holds, so "claim 3f9a1c" reads as a person.
+function claimName(iri) {
+  const names = (current[iri] || {})[CREATOR];
+  return names && names.length ? names[0].value : "";
+}
+
+// --- subjects -----------------------------------------------------------------
 async function loadSubjects() {
-  const { subjects } = await (await fetch("/subjects")).json();
-  if (!subjects.length) {
+  const body = await (await fetch("/subjects")).json();
+  labels = body.labels || {};
+  if (!body.subjects.length) {
     el("subjects").innerHTML =
-      '<p class="hint">Nothing written yet. Run the enrich flow first.</p>';
+      '<p class="hint">Nothing written yet. Upload a file or run a sample.</p>';
     return;
   }
   el("subjects").innerHTML = "";
-  for (const iri of subjects) {
+  for (const iri of body.subjects) {
     const button = document.createElement("button");
     button.className = "item";
     button.dataset.iri = iri;
-    button.innerHTML = '<div class="name">' + shortName(iri) + "</div>";
+    button.innerHTML =
+      '<div class="label">' + esc(labels[iri] || shortName(iri)) + "</div>" +
+      '<div class="name">' + esc(shortName(iri)) + "</div>";
     button.onclick = () => selectSubject(iri, button);
     el("subjects").append(button);
+  }
+}
+
+// The current values, by node, so a change can show its claim's creator and a
+// correction can start from the value as it stands now.
+async function loadCurrent(iri) {
+  const result = await get("/reconstruct", { subject: iri, at: FAR_FUTURE });
+  current = {};
+  for (const row of result.statements) {
+    const node = (current[row.statement || ""] ||= {});
+    (node[row.predicate] ||= []).push(row.object);
   }
 }
 
@@ -199,66 +263,181 @@ async function selectSubject(iri, button) {
   }
   el("state").innerHTML = '<p class="hint">Choose a snapshot.</p>';
 
+  // Which data this provenance belongs to: every snapshot below is
+  // prov:specializationOf this subject.
+  el("about").innerHTML =
+    '<div class="about">Provenance of <b>' + esc(labels[iri] || shortName(iri)) +
+    "</b><code>" + esc(iri) + "</code></div>";
+
+  await loadCurrent(iri);
   const { snapshots } = await get("/history", { subject: iri });
   el("timeline").innerHTML = "";
-
-  snapshots.forEach((snap, index) => {
-    const human = snap.agents.some((a) => a.includes("orcid.org"));
-    const row = document.createElement("div");
-    row.className = "item";
-    row.innerHTML =
-      '<div><span class="tag ' + (human ? "person" : "software") + '">' +
-        (human ? "person" : "software") + "</span>" +
-      '<span class="tag">' + (snapshots.length - index) + "</span></div>" +
-      '<div class="meta">' + snap.description + "</div>" +
-      '<div class="meta">' + snap.generated_at + "</div>" +
-      (snap.batch
-        ? '<div class="batch">batch ' + snap.batch.slice(0, 8) + "</div>"
-        : "");
-
-    // Mark the stages produced by the run that just finished, so a person can
-    // see which rows came from one workflow.
-    if (freshBatch && snap.batch === freshBatch) row.classList.add("fresh");
-
-    // The whole row selects the moment; the link opens the envelope.
-    row.onclick = () => selectSnapshot(snap, row);
-
-    const more = document.createElement("button");
-    more.className = "link";
-    more.textContent = "More details";
-    more.onclick = (event) => {
-      event.stopPropagation();
-      showEnvelope(snap.snapshot);
-    };
-    row.append(more);
-    el("timeline").append(row);
-  });
+  snapshots.forEach((snap, index) =>
+    el("timeline").append(snapshotRow(snap, snapshots.length - index)));
 }
 
+// --- one snapshot ---------------------------------------------------------------
+function snapshotRow(snap, number) {
+  // A person decided, not merely commissioned: an uploader is named on every
+  // import, but the import itself is still software's work.
+  const human = (snap.validation_state || "").startsWith("human");
+  const row = document.createElement("div");
+  row.className = "item";
+  row.innerHTML =
+    '<div><span class="tag ' + (human ? "person" : "software") + '">' +
+      (human ? "person" : "software") + "</span>" +
+    '<span class="tag">' + number + "</span></div>" +
+    '<div class="meta">' + esc(snap.description) + "</div>" +
+    '<div class="meta">' + esc(snap.generated_at) + "</div>" +
+    (snap.batch ? '<div class="batch">batch ' + esc(snap.batch.slice(0, 8)) + "</div>" : "");
+
+  // Mark the stages produced by the run that just finished.
+  if (freshBatch && snap.batch === freshBatch) row.classList.add("fresh");
+  row.onclick = () => selectSnapshot(snap, row);
+
+  const list = document.createElement("ul");
+  list.className = "changes";
+  for (const change of snap.changes || []) {
+    for (const value of change.removed) list.append(changeLine(snap, change, value, "del"));
+    for (const value of change.added) list.append(changeLine(snap, change, value, "add"));
+  }
+  if (list.children.length) row.append(list);
+
+  const more = document.createElement("button");
+  more.className = "link";
+  more.textContent = "More details";
+  more.onclick = (event) => {
+    event.stopPropagation();
+    showEnvelope(snap.snapshot);
+  };
+  row.append(more);
+  return row;
+}
+
+function changeLine(snap, change, value, op) {
+  const li = document.createElement("li");
+  const where = change.statement
+    ? '<span class="claim" title="' + esc(change.statement) + '">' +
+      esc(shortClaim(change.statement)) +
+      (claimName(change.statement) && change.property !== CREATOR
+        ? " · " + esc(claimName(change.statement)) : "") + "</span>"
+    : "";
+  li.innerHTML =
+    '<span class="op ' + op + '">' + (op === "add" ? "+" : "−") + "</span>" +
+    '<span class="k" title="' + esc(change.property) + '">' +
+      esc(shortProperty(change.property)) + "</span>" +
+    '<span class="v" title="' + esc(value.value) + '">' + esc(shortValue(value)) + "</span>" +
+    where;
+
+  // Only what a snapshot asserted can be corrected; a removal is history.
+  if (op === "add") {
+    const fix = document.createElement("button");
+    fix.className = "fix";
+    fix.textContent = "Correct";
+    fix.onclick = (event) => {
+      event.stopPropagation();
+      openEditor(li, snap, change, value);
+    };
+    li.append(fix);
+  }
+  return li;
+}
+
+// The editor starts from the value as it stands now, which may differ from what
+// this snapshot wrote if a later one changed it.
+function openEditor(li, snap, change, value) {
+  if (li.querySelector(".editor")) return;
+  const now = ((current[change.statement || ""] || {})[change.property] || [value])[0];
+  const box = document.createElement("div");
+  box.className = "editor";
+  box.onclick = (event) => event.stopPropagation();
+  box.innerHTML =
+    '<input aria-label="New value">' +
+    '<button class="apply" type="button">Apply</button>' +
+    '<button class="cancel" type="button">Cancel</button>';
+  const input = box.querySelector("input");
+  input.value = now.value;
+  box.querySelector(".cancel").onclick = () => box.remove();
+  box.querySelector(".apply").onclick = () =>
+    applyCorrection(box, snap, change, input.value.trim(), value.type === "uri");
+  li.append(box);
+  input.focus();
+}
+
+async function applyCorrection(box, snap, change, newValue, isIri) {
+  box.querySelector(".err")?.remove();
+  if (!newValue) return;
+  for (const b of box.querySelectorAll("button")) b.disabled = true;
+  try {
+    const response = await fetch(ENRICH_URL + "/correct", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: subject,
+        curator: el("you").value,
+        property: change.property,
+        value: newValue,
+        value_is_iri: isIri,
+        statement: change.statement,
+        corrects: snap.snapshot,
+      }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      const errors = (body.errors || body.detail || []).map((e) => e.message || e.msg);
+      throw new Error(errors.join("; ") || "The enrich service returned " + response.status + ".");
+    }
+    // A correction belongs to no workflow, so nothing is marked fresh.
+    freshBatch = null;
+    const match = [...document.querySelectorAll("#subjects .item")].find(
+      (b) => b.dataset.iri === subject
+    );
+    await selectSubject(subject, match);
+  } catch (error) {
+    const err = document.createElement("div");
+    err.className = "err";
+    err.textContent = error instanceof TypeError
+      ? "Could not reach the enrich service at " + ENRICH_URL + "."
+      : error.message;
+    box.append(err);
+    for (const b of box.querySelectorAll("button")) b.disabled = false;
+  }
+}
+
+// --- the state at a moment --------------------------------------------------------
 async function selectSnapshot(snap, row) {
-  for (const other of document.querySelectorAll("#timeline .item")) {
+  for (const other of document.querySelectorAll("#timeline > .item")) {
     other.setAttribute("aria-selected", String(other === row));
   }
   // Reconstruct at this snapshot's own time, so the state shown is the state
   // this snapshot produced, not the state that replaced it.
-  const result = await get("/reconstruct", {
-    subject: subject,
-    at: snap.generated_at,
-  });
-
+  const result = await get("/reconstruct", { subject: subject, at: snap.generated_at });
   if (!result.statements.length) {
     el("state").innerHTML = '<p class="hint">Nothing was asserted at this time.</p>';
     return;
   }
-  const rows = result.statements
-    .map((s) =>
-      '<tr><td class="k" title="' + s.predicate + '">' +
-      shortProperty(s.predicate) + '</td><td class="v">' +
-      s.object.value + "</td></tr>")
-    .join("");
-  el("state").innerHTML =
-    '<code class="at">as at ' + snap.generated_at + "</code>" +
-    "<table>" + rows + "</table>";
+
+  const groups = new Map();
+  for (const s of result.statements) {
+    const key = s.statement || "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  }
+  const table = (rows) =>
+    "<table>" + rows.map((s) =>
+      '<tr><td class="k" title="' + esc(s.predicate) + '">' +
+      esc(shortProperty(s.predicate)) + '</td><td class="v" title="' +
+      esc(s.object.value) + '">' + esc(shortValue(s.object)) + "</td></tr>").join("") +
+    "</table>";
+
+  let html = '<code class="at">as at ' + esc(snap.generated_at) + "</code>";
+  if (groups.has("")) html += table(groups.get(""));
+  for (const [claim, rows] of groups) {
+    if (!claim) continue;
+    html += '<h3>Creator claim <span class="claim" title="' + esc(claim) + '">' +
+      esc(shortClaim(claim)) + "</span></h3>" + table(rows);
+  }
+  el("state").innerHTML = html;
 }
 
 async function showEnvelope(uri) {
@@ -267,83 +446,81 @@ async function showEnvelope(uri) {
   el("details").showModal();
 }
 
-// --- running a workflow ---------------------------------------------------
-el("runform").onsubmit = async (event) => {
-  event.preventDefault();
-  const button = el("runbtn");
+// --- running a workflow over an upload ------------------------------------------
+// A file and a packaged sample go through the same endpoint logic on the
+// enrich side, so both buttons exercise the same path.
+const RUN_BUTTONS = ["uploadbtn", "sampleperson", "sampleartifacts"];
+
+async function runUpload(send, label) {
   const status = el("status");
-  const target = el("subject").value;
-
-  button.disabled = true;
+  RUN_BUTTONS.forEach((id) => (el(id).disabled = true));
   status.className = "status";
-  status.textContent = "Running three stages… this takes a few seconds.";
+  status.textContent = "Running " + label + "… a batch of 20 takes about half a minute.";
 
   try {
-    const response = await fetch(ENRICH_URL + "/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: el("name").value, subject: target }),
-    });
-    if (!response.ok) throw new Error("the enrich service returned " + response.status);
+    let response;
+    try {
+      response = await send();
+    } catch (error) {
+      throw new Error("Could not reach the enrich service at " + ENRICH_URL + ".");
+    }
+    const body = await response.json();
+    if (!response.ok) {
+      // The enrich service names the record that stopped the upload.
+      const errors = (body.errors || []).map((e) => e.path + ": " + e.message);
+      throw new Error(errors.join("; ") || "The enrich service returned " + response.status + ".");
+    }
 
-    const result = await response.json();
-    freshBatch = result.batch;
+    freshBatch = body.batch;
+    const incomplete = body.results.filter((r) => r.verdict === "incomplete").length;
     status.textContent =
-      result.stages.length + " stages written, batch " + result.batch.slice(0, 8);
+      body.records + (body.records === 1 ? " record, " : " records, ") +
+      body.snapshots + " snapshots, batch " + body.batch.slice(0, 8) +
+      (incomplete ? ". " + incomplete + " incomplete." : ".");
 
     await loadSubjects();
+    const first = body.results[0].subject;
     const match = [...document.querySelectorAll("#subjects .item")].find(
-      (b) => b.dataset.iri === target
+      (b) => b.dataset.iri === first
     );
-    if (match) await selectSubject(target, match);
+    if (match) await selectSubject(first, match);
   } catch (error) {
     status.className = "status bad";
-    status.textContent =
-      "Could not reach the enrich service at " + ENRICH_URL + ". " + error.message;
+    status.textContent = error.message;
   } finally {
-    button.disabled = false;
+    RUN_BUTTONS.forEach((id) => (el(id).disabled = false));
   }
-};
+}
 
-el("correctform").onsubmit = async (event) => {
+el("uploadform").onsubmit = (event) => {
   event.preventDefault();
-  const button = el("correctbtn");
-  const status = el("correctstatus");
-  const target = el("subject").value;
-
-  button.disabled = true;
-  status.className = "status";
-  status.textContent = "Applying…";
-
-  try {
-    const response = await fetch(ENRICH_URL + "/correct", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject: target,
-        corrected: el("corrected").value,
-        curator: el("curator").value,
-      }),
-    });
-    if (!response.ok) throw new Error("the enrich service returned " + response.status);
-    await response.json();
-
-    // A correction belongs to no workflow, so nothing is marked fresh.
-    freshBatch = null;
-    status.textContent = "Corrected. The newest snapshot is now a person's.";
-
-    await loadSubjects();
-    const match = [...document.querySelectorAll("#subjects .item")].find(
-      (b) => b.dataset.iri === target
-    );
-    if (match) await selectSubject(target, match);
-  } catch (error) {
-    status.className = "status bad";
-    status.textContent = "Could not apply the correction. " + error.message;
-  } finally {
-    button.disabled = false;
+  const file = el("file").files[0];
+  if (!file) {
+    el("status").className = "status bad";
+    el("status").textContent = "Choose a CSV or JSON file first.";
+    return;
   }
+  const form = new FormData();
+  form.append("file", file);
+  form.append("uploader", el("you").value);
+  runUpload(() => fetch(ENRICH_URL + "/upload", { method: "POST", body: form }), file.name);
 };
+
+for (const [id, sample, label] of [
+  ["sampleperson", "person", "one person"],
+  ["sampleartifacts", "artifacts", "20 artifacts"],
+]) {
+  el(id).onclick = () =>
+    runUpload(
+      () =>
+        fetch(ENRICH_URL + "/upload/sample", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sample, uploader: el("you").value }),
+        }),
+      label
+    );
+}
 
 loadSubjects();
 </script>

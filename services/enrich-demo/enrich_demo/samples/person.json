@@ -1,0 +1,15 @@
+{
+  "_synthetic": "Invented sample in the shape of an archive agent record. The person is real and the authority id is real; the record itself is not taken from any archive.",
+  "id": 90001,
+  "type": "person",
+  "status": "Einzelperson",
+  "givenName": "Luciano",
+  "familyName": "Berio",
+  "familyNamePrefix": "",
+  "pseudonym": "",
+  "titles": null,
+  "gndId": "118509594",
+  "viafId": "",
+  "wikidataId": null,
+  "deletedAt": null
+}

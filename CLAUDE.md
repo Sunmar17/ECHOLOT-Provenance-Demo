@@ -144,6 +144,12 @@ ECHOLOT-Provenance/
       enrich_demo/
         flow.py                  # nested: uv_build cannot package a bare
                                  # root-level .py module (see Deviations log)
+        upload.py                # CSV or JSON file -> records; pure
+        vocab.py                 # enrich-side IRIs and the subject rule
+        service.py               # POST /upload, /upload/sample, /correct
+        wikidata_standin.json    # local stand-in for Wikidata (invariant 9)
+        samples/                 # synthetic: one person (JSON), 20 artifacts (CSV)
+  examples/                      # untracked: real ZKM records, never committed
 ```
 
 ## Commands

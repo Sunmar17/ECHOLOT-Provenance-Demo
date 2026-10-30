@@ -20,6 +20,8 @@ from app.namespaces import (
     GRAPH_PROVENANCE,
     NAMED_GRAPHS,
     PROV,
+    RDFS,
+    STATEMENT,
 )
 
 Term = ox.NamedNode | ox.BlankNode | ox.Literal
@@ -62,6 +64,33 @@ class Store:
             (q.predicate, q.object)
             for q in self._store.quads_for_pattern(subject, None, None, GRAPH_DATA)
         }
+
+    def claims_of(self, subject: ox.NamedNode) -> set[ox.NamedNode]:
+        """The claims a subject currently links to with ``echolot:statement``."""
+        return {
+            q.object
+            for q in self._store.quads_for_pattern(subject, STATEMENT, None, GRAPH_DATA)
+            if isinstance(q.object, ox.NamedNode)
+        }
+
+    def subject_triples(self, subject: ox.NamedNode) -> set[tuple[Term, Term, Term]]:
+        """The subject's own triples and those of every claim it links to.
+
+        A claim belongs to its subject's state, so reconstructing the subject
+        reconstructs its claims too.
+        """
+        nodes = [subject, *self.claims_of(subject)]
+        return {
+            (q.subject, q.predicate, q.object)
+            for node in nodes
+            for q in self._store.quads_for_pattern(node, None, None, GRAPH_DATA)
+        }
+
+    def label_of(self, subject: ox.NamedNode) -> str | None:
+        """The subject's ``rdfs:label``, for showing a name instead of an IRI."""
+        for q in self._store.quads_for_pattern(subject, RDFS.label, None, GRAPH_DATA):
+            return q.object.value
+        return None
 
     def snapshots_of(self, subject: ox.NamedNode) -> set[ox.NamedNode]:
         """Every snapshot that is a version of this subject."""

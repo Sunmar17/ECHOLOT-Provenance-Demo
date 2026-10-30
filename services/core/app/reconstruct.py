@@ -19,8 +19,9 @@ from app.namespaces import (
     ECHOLOT,
     OCO,
     PROV,
+    STATEMENT,
 )
-from app.provenance import Delta, Term, invert, parse_delta
+from app.provenance import Delta, Term, Triple, invert, parse_delta
 from app.store import Store
 
 
@@ -29,11 +30,56 @@ def parse_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def apply_delta(state: set[tuple[Term, Term]], delta: Delta) -> set[tuple[Term, Term]]:
-    """Apply a delta to an in-memory predicate/object set."""
+def apply_delta(state: set[Triple], delta: Delta) -> set[Triple]:
+    """Apply a delta to an in-memory set of triples.
+
+    Whole triples, not predicate/object pairs: a subject's state now includes
+    its claims, whose values have the claim as their subject.
+    """
     out = set(state)
-    out -= {(p, o) for _, p, o in delta.removed}
-    out |= {(p, o) for _, p, o in delta.added}
+    out -= set(delta.removed)
+    out |= set(delta.added)
+    return out
+
+
+def _json(term: Term) -> dict[str, str]:
+    """A term in the SPARQL 1.1 Results JSON shape the page already reads."""
+    if isinstance(term, ox.NamedNode):
+        return {"type": "uri", "value": term.value}
+    out = {"type": "literal", "value": term.value}
+    if isinstance(term, ox.Literal) and term.language:
+        out["xml:lang"] = term.language
+    return out
+
+
+def changes(delta: Delta, subject: ox.NamedNode) -> list[dict]:
+    """A delta grouped by what it touched: each plain property, and each claim.
+
+    This is what makes one delta readable per claim. A claim's values have the
+    claim as their subject, so grouping by node needs no extra bookkeeping and
+    cannot pair a removed value with the wrong added one.
+    """
+    groups: dict[tuple[str | None, str], dict] = {}
+    created: set[str] = set()
+
+    def group(claim: str | None, predicate: str) -> dict:
+        return groups.setdefault(
+            (claim, predicate),
+            {"statement": claim, "property": predicate, "added": [], "removed": []},
+        )
+
+    for side, triples in (("removed", delta.removed), ("added", delta.added)):
+        for s, p, o in triples:
+            if s == subject and p == STATEMENT:
+                if side == "added":
+                    created.add(o.value)
+                continue
+            claim = None if s == subject else s.value
+            group(claim, p.value)[side].append(_json(o))
+
+    out = sorted(groups.values(), key=lambda g: (g["statement"] or "", g["property"]))
+    for entry in out:
+        entry["new_claim"] = entry["statement"] in created
     return out
 
 
@@ -45,16 +91,14 @@ def _all(values: list[Term] | None) -> list[str]:
     return sorted(v.value for v in values) if values else []
 
 
-def reconstruct(
-    store: Store, subject: ox.NamedNode, at: datetime
-) -> set[tuple[Term, Term]]:
-    """The state of a subject at a past moment.
+def reconstruct(store: Store, subject: ox.NamedNode, at: datetime) -> set[Triple]:
+    """The state of a subject, and of its claims, at a past moment.
 
     Starts from current state and undoes every snapshot generated after ``at``.
     Every snapshot in the chain is examined rather than stopping at the first
     old one, so an out-of-order or equal timestamp cannot truncate the walk.
     """
-    state = store.subject_state(subject)
+    state = store.subject_triples(subject)
 
     for snapshot in store.chain(subject):
         props = store.properties_of(snapshot)
@@ -86,6 +130,7 @@ def history(store: Store, subject: ox.NamedNode) -> list[dict]:
     out: list[dict] = []
     for snapshot in store.chain(subject):
         props = store.properties_of(snapshot)
+        query = _one(props.get(OCO.hasUpdateQuery.value))
         out.append(
             {
                 "snapshot": snapshot.value,
@@ -98,6 +143,7 @@ def history(store: Store, subject: ox.NamedNode) -> list[dict]:
                 "activity": _one(props.get(PROV.wasGeneratedBy.value)),
                 "derived_from": _one(props.get(PROV.wasDerivedFrom.value)),
                 "batch": _batch_of(store, props),
+                "changes": changes(parse_delta(query), subject) if query else [],
             }
         )
     return out
