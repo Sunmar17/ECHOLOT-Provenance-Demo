@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pyoxigraph as ox
+from echolot_neowiki_client.client import NeoWikiClient, NeoWikiError
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from app import provenance, reconstruct, validation
 from app.namespaces import (
     DCTERMS,
+    DEMO_BASE,
     OCO,
     PROV,
     STATEMENT,
@@ -40,6 +42,11 @@ app = FastAPI(
 )
 
 store = Store(os.environ.get("ECHOLOT_STORE_PATH") or None)
+
+# The interim NeoWiki client (docs/revisionfile.md entry 26). None unless the
+# environment names a wiki, in which case Core behaves exactly as it always did.
+# `default_base_iri` is Core's own demo base: the client has no base of its own.
+neowiki_client = NeoWikiClient.from_environment(default_base_iri=DEMO_BASE)
 
 # The curator UI: plain HTML and fetch, served from this package. Mounted last
 # in the file so every API route is registered before it.
@@ -191,7 +198,7 @@ def write(body: dict) -> Any:
 
     store.apply(update)
 
-    return {
+    result: dict[str, Any] = {
         "snapshot": snapshot.value,
         "subject": subject.value,
         "changed": not delta.is_empty,
@@ -199,6 +206,28 @@ def write(body: dict) -> Any:
         "removed": len(delta.removed),
         "claims": [iri.value for iri in claim_iris],
     }
+
+    # Second, after Core's own commit: Core is complete without NeoWiki, so a
+    # failure here loses nothing. It is still reported loudly, because a quiet
+    # gap would be a record with provenance in one place and not the other.
+    if neowiki_client is not None:
+        try:
+            result["neowiki"] = neowiki_client.append(envelope)
+        except NeoWikiError as exc:
+            return JSONResponse(
+                status_code=502,
+                content={
+                    "errors": [
+                        {
+                            "path": "/neowiki",
+                            "message": f"Core committed {snapshot.value}, but NeoWiki "
+                            f"did not store the envelope: {exc}",
+                        }
+                    ],
+                    "committed": result,
+                },
+            )
+    return result
 
 
 def _terms(values: dict) -> dict[str, set[provenance.Term]]:
@@ -308,12 +337,18 @@ def get_subjects() -> Any:
     can show "Probenvideo" rather than an IRI.
     """
     subjects = store.subjects()
-    return {
+    body: dict[str, Any] = {
         "subjects": [s.value for s in subjects],
         "labels": {
             s.value: label for s in subjects if (label := store.label_of(s)) is not None
         },
     }
+    if neowiki_client is not None:
+        # Where each subject's provenance history can be read in NeoWiki.
+        body["neowiki_history"] = {
+            s.value: neowiki_client.history_url(s.value) for s in subjects
+        }
+    return body
 
 
 @app.get("/snapshot")

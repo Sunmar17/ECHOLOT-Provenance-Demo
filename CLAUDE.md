@@ -24,6 +24,7 @@ history of an entity and reconstructs a past state.
 | Component | Status | Implication |
 |---|---|---|
 | `packages/echolot-prov` (emitter library) | Production-intended | Library-quality code, stable public API, full tests |
+| `packages/echolot-neowiki-client` (NeoWiki writer) | Production-intended | Independent of both the emitter and Core; Core's `/write` is its only caller today |
 | Pydantic envelope models + generated JSON Schema | Production-intended | The normative contract between producers and Core |
 | PROV-O snapshotting and reconstruction logic (`provenance.py`, `reconstruct.py`) | Production-intended logic | Will be ported to PHP: keep it simple, deterministic, free of framework coupling |
 | FastAPI app, Oxigraph store, UI, enrich-demo flow, identity stub | Placeholder | Minimal; no premature abstraction |
@@ -47,7 +48,9 @@ Do not change any of these without asking first.
    JSON Schema and rejects the entire request on failure, with structured errors.
 4. **Atomicity.** The data change and its provenance are committed together
    (one SPARQL UPDATE or one store transaction). No data without provenance,
-   no provenance without data.
+   no provenance without data. **Relaxed on 2026-11-22 by the user: not
+   mandatory at the moment**, because NeoWiki is to replace Core (see the plan,
+   "Decision 2026-11-22"). It still holds inside Core until Core is removed.
 5. **Pure envelope construction.** Building the envelope is a pure function:
    context in, validated JSON out, no I/O. Ambient capture lives in `context.py`
    and is injectable: `Context` can be built from the live environment or from a
@@ -84,11 +87,11 @@ Do not change any of these without asking first.
 ## Stack
 
 - Python 3.12, `uv` workspace (one root `pyproject.toml`, members under
-  `packages/` and `services/`). **Applications pin, the library does not:** the
+  `packages/` and `services/`). **Applications pin, the libraries do not:** the
   root and both services declare `requires-python = "==3.12.*"` (the demo's
-  runtime), while `packages/echolot-prov` declares `requires-python = ">=3.12"`
-  so an Enrich service on a newer Python can still depend on it. Never put a
-  ceiling on the library.
+  runtime), while `packages/echolot-prov` and `packages/echolot-neowiki-client`
+  declare `requires-python = ">=3.12"` so an Enrich service on a newer Python
+  can still depend on them. Never put a ceiling on a library.
 - Pydantic v2 (models use `extra="forbid"`, so unknown fields are rejected and
   the generated schema carries `additionalProperties: false`).
 - FastAPI (stand-in Core), `pyoxigraph` (embedded store, stand-in only; the
@@ -132,6 +135,14 @@ ECHOLOT-Provenance/
           envelope-1.0.schema.json   # wheel. One frozen file per version:
           envelope-1.1.schema.json   # 1.1 names individual claims.
       fixtures/<version>/valid/  fixtures/<version>/invalid/
+      tests/
+    echolot-neowiki-client/
+      pyproject.toml
+      src/echolot_neowiki_client/
+        client.py                # NeoWikiClient: writes an envelope into NeoWiki
+                                 # as a JSON page revision, over the MediaWiki
+                                 # Action API. No base IRI of its own; a caller
+                                 # always supplies one.
       tests/
   services/
     core/

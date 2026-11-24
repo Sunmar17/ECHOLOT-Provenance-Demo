@@ -80,6 +80,8 @@ h2 { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
   border-left: 3px solid var(--accent); background: var(--accent-soft); }
 .about code { display: block; font-family: var(--mono); font-size: 11px;
   color: var(--ink-2); word-break: break-all; }
+.about a { display: inline-block; margin-top: 6px; font-size: 12px;
+  color: var(--accent); }
 
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 td { border-bottom: 1px solid var(--line); padding: 7px 8px; vertical-align: top; }
@@ -184,6 +186,7 @@ const FAR_FUTURE = "2999-01-01T00:00:00Z";
 
 let subject = null;
 let labels = {};
+let historyLinks = {};  // subject IRI -> its provenance history page in NeoWiki
 let current = {};  // claim IRI ("" for the subject itself) -> property -> values
 let freshBatch = null;
 
@@ -227,6 +230,7 @@ function claimName(iri) {
 async function loadSubjects() {
   const body = await (await fetch("/subjects")).json();
   labels = body.labels || {};
+  historyLinks = body.neowiki_history || {};  // only present when Core mirrors to NeoWiki
   if (!body.subjects.length) {
     el("subjects").innerHTML =
       '<p class="hint">Nothing written yet. Upload a file or run a sample.</p>';
@@ -268,6 +272,18 @@ async function selectSubject(iri, button) {
   el("about").innerHTML =
     '<div class="about">Provenance of <b>' + esc(labels[iri] || shortName(iri)) +
     "</b><code>" + esc(iri) + "</code></div>";
+
+  // The same history, kept in NeoWiki. A link only, and only for http(s): the
+  // address is built from the data, so it is checked, not trusted.
+  const wiki = historyLinks[iri];
+  if (wiki && /^https?:\/\//.test(wiki)) {
+    const link = document.createElement("a");
+    link.href = wiki;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "Open history in NeoWiki";
+    el("about").firstChild.append(link);
+  }
 
   await loadCurrent(iri);
   const { snapshots } = await get("/history", { subject: iri });

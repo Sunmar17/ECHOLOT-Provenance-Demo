@@ -6,6 +6,7 @@ requires-python = "==3.12.*"
 members = [
     "echolot-core",
     "echolot-enrich-demo",
+    "echolot-neowiki-client",
     "echolot-prov",
     "echolot-provenance",
 ]
@@ -414,8 +415,10 @@ name = "echolot-core"
 version = "0.1.0"
 source = { editable = "services/core" }
 dependencies = [
+    { name = "echolot-neowiki-client" },
     { name = "echolot-prov" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "httpx" },
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pyoxigraph" },
     { name = "rdflib" },
@@ -423,8 +426,10 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "echolot-neowiki-client", editable = "packages/echolot-neowiki-client" },
     { name = "echolot-prov", editable = "packages/echolot-prov" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.23" },
     { name = "pyoxigraph", specifier = ">=0.5" },
     { name = "rdflib", specifier = ">=7.1" },
@@ -448,6 +453,17 @@ requires-dist = [
 ]
 
 [[package]]
+name = "echolot-neowiki-client"
+version = "0.1.0"
+source = { editable = "packages/echolot-neowiki-client" }
+dependencies = [
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "httpx", specifier = ">=0.28" }]
+
+[[package]]
 name = "echolot-prov"
 version = "0.1.0"
 source = { editable = "packages/echolot-prov" }
@@ -469,6 +485,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "echolot-core" },
     { name = "echolot-enrich-demo" },
+    { name = "echolot-neowiki-client" },
     { name = "echolot-prov" },
 ]
 
@@ -483,6 +500,7 @@ dev = [
 requires-dist = [
     { name = "echolot-core", editable = "services/core" },
     { name = "echolot-enrich-demo", editable = "services/enrich-demo" },
+    { name = "echolot-neowiki-client", editable = "packages/echolot-neowiki-client" },
     { name = "echolot-prov", editable = "packages/echolot-prov" },
 ]
 

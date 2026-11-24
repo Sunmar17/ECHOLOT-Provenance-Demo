@@ -5,6 +5,7 @@ description = "ECHOLOT provenance flow demonstrator (FR3.5)"
 requires-python = "==3.12.*"
 dependencies = [
     "echolot-prov",
+    "echolot-neowiki-client",
     "echolot-core",
     "echolot-enrich-demo",
 ]
@@ -13,10 +14,16 @@ dependencies = [
 package = false
 
 [tool.uv.workspace]
-members = ["packages/echolot-prov", "services/core", "services/enrich-demo"]
+members = [
+    "packages/echolot-prov",
+    "packages/echolot-neowiki-client",
+    "services/core",
+    "services/enrich-demo",
+]
 
 [tool.uv.sources]
 echolot-prov = { workspace = true }
+echolot-neowiki-client = { workspace = true }
 echolot-core = { workspace = true }
 echolot-enrich-demo = { workspace = true }
 

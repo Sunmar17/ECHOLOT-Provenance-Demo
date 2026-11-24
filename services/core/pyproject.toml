@@ -5,7 +5,9 @@ description = "Stand-in Core: validates envelopes and stores PROV-O (placeholder
 requires-python = "==3.12.*"
 dependencies = [
     "echolot-prov",
+    "echolot-neowiki-client",
     "fastapi[standard]>=0.115",
+    "httpx>=0.28",
     "pyoxigraph>=0.5",
     "rdflib>=7.1",
     "jsonschema[format-nongpl]>=4.23",
